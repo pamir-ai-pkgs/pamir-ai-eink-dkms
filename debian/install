@@ -1,1 +1,4 @@
-# README.md usr/share/doc/pamir-ai-eink-dkms/
+README.md usr/share/doc/pamir-ai-eink-dkms/
+examples/*.c usr/share/doc/pamir-ai-eink-dkms/examples/
+examples/*.py usr/share/doc/pamir-ai-eink-dkms/examples/
+pamir-ai-eink.h usr/include/linux/

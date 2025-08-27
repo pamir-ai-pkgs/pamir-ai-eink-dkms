@@ -15,13 +15,16 @@ override_dh_auto_test:
 override_dh_auto_install:
 	# Install DKMS source files
 	install -d debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0
-	install -m 644 *.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 pamir-ai-eink-core.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 pamir-ai-eink-hw.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 pamir-ai-eink-display.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 pamir-ai-eink-fb.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 pamir-ai-eink-sysfs.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 pamir-ai-eink-internal.h debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 pamir-ai-eink.h debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
 	install -m 644 Makefile debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
 	install -m 644 dkms.conf debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
 	install -m 644 *.dts debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	# Install documentation
-	# install -d debian/pamir-ai-eink-dkms/usr/share/doc/pamir-ai-eink-dkms
-	# install -m 644 README.md debian/pamir-ai-eink-dkms/usr/share/doc/pamir-ai-eink-dkms/
 
 override_dh_installdeb:
 	dh_installdeb

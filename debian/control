@@ -18,7 +18,16 @@ Depends: ${misc:Depends},
          linux-headers-rpi-2712
 Recommends:
 Suggests:
-Description: PamirAI Incorporated SAM DKMS kernel modules
- This package provides DKMS (Dynamic Kernel Module Support) modules
- for the PamirAI Incorporated SAM on Raspberry Pi CM5 and Distiller
- devices.
+Description: Pamir AI E-Ink Display Driver (DKMS)
+ This package provides a DKMS (Dynamic Kernel Module Support) driver
+ for Pamir AI E-Ink displays using the SSD1681 controller.
+ .
+ Features:
+  - Support for 128x250 monochrome E-Ink displays
+  - Multiple update modes (full, partial, base map)
+  - Framebuffer interface (/dev/fb0)
+  - Sysfs control interface
+  - IOCTL control for advanced features
+  - Deep sleep mode for power efficiency
+ .
+ Compatible with Raspberry Pi CM5 and other SPI-enabled devices.

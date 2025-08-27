@@ -1,5 +1,19 @@
+pamir-ai-eink-dkms (1.0.0-2) unstable; urgency=medium
+
+  * Major refactoring: Split monolithic driver into multiple files
+  * Added comprehensive update mode support (full, partial, base map)
+  * Implemented proper mmap support using vmalloc_user
+  * Added IOCTL interface for advanced control
+  * Added sysfs interface for runtime configuration
+  * Fixed all kernel coding style issues
+  * Added deep sleep mode support
+  * Improved error handling and recovery
+  * Added comprehensive documentation and examples
+
+ -- Pamir AI <support@pamir.ai>  Thu, 28 Aug 2025 01:09:58 +0530
+
 pamir-ai-eink-dkms (1.0.0-1) unstable; urgency=medium
 
-  * Initial release of PamirAI Incorporated E-Ink FB driver
+  * Initial release of Pamir AI E-Ink framebuffer driver
 
- -- PamirAI Incorporated <founders@pamir.ai>  $(date -R)
+ -- Pamir AI <support@pamir.ai>  Wed, 27 Aug 2025 12:00:00 +0530

@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Pamir AI E-Ink FB DKMS Installation Script
-# This script installs the Pamir AI E-Ink FB (Signal Aggregation Module) driver as a DKMS module
+# Pamir AI E-Ink Display Driver DKMS Installation Script
+# This script installs the Pamir AI E-Ink display driver as a DKMS module
 
 set -e
 
 PACKAGE_NAME="pamir-ai-eink"
-PACKAGE_VERSION="1.0.0"
+PACKAGE_VERSION="2.0.0"
 DKMS_SOURCE_DIR="/usr/src/${PACKAGE_NAME}-${PACKAGE_VERSION}"
 
 # Check if running as root
@@ -15,7 +15,7 @@ if [[ $EUID -ne 0 ]]; then
 	exit 1
 fi
 
-echo "Installing Pamir AI E-Ink FB DKMS module..."
+echo "Installing Pamir AI E-Ink Display Driver DKMS module..."
 
 # Create DKMS source directory
 mkdir -p "${DKMS_SOURCE_DIR}"
@@ -38,7 +38,7 @@ dkms build -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}"
 echo "Installing DKMS module..."
 dkms install -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}"
 
-echo "Pamir AI E-Ink FB DKMS installation completed successfully!"
+echo "Pamir AI E-Ink Display Driver DKMS installation completed successfully!"
 
 # Compile and copy device tree overlay
 DTS_SOURCE="${DKMS_SOURCE_DIR}/pamir-ai-eink-overlay.dts"
@@ -79,14 +79,15 @@ else
 fi
 
 echo ""
-echo "To enable the Pamir AI E-Ink FB module:"
+echo "To enable the Pamir AI E-Ink Display:"
 echo "1. Add 'dtoverlay=pamir-ai-eink' to /boot/config.txt"
 echo "2. Reboot your system"
 echo ""
-echo "The SAM module provides:"
-echo "  - Button input events via /dev/input/event*"
-echo "  - LED control via /sys/class/leds/pamir:status/"
-echo "  - Character device interface via /dev/pamir-sam"
+echo "The E-Ink driver provides:"
+echo "  - Framebuffer interface via /dev/fb0"
+echo "  - Sysfs controls via /sys/bus/spi/devices/spi*/update_mode"
+echo "  - IOCTL interface for advanced control"
+echo "  - Support for full, partial, and base map update modes"
 echo ""
 echo "To remove the module:"
 echo "  sudo dkms remove ${PACKAGE_NAME}/${PACKAGE_VERSION} --all"

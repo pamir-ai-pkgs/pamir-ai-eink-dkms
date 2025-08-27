@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Pamir AI E-Ink FB DKMS Debian Package Builder
-# This script builds a Debian package for the Pamir AI E-Ink FB DKMS modules
+# Pamir AI E-Ink Display Driver DKMS Debian Package Builder
+# This script builds a Debian package for the Pamir AI E-Ink Display Driver DKMS modules
 
 set -e
 
 # Configuration
 PACKAGE_NAME="pamir-ai-eink-dkms"
-PACKAGE_VERSION="1.0.0"
+PACKAGE_VERSION="2.0.0"
 DEBIAN_REVISION="1"
 FULL_VERSION="${PACKAGE_VERSION}-${DEBIAN_REVISION}"
 BUILD_DIR="dist"
@@ -111,10 +111,17 @@ prepare_source() {
 	mkdir -p "${source_dir}"
 
 	# Copy source files
-	cp -r "${SCRIPT_DIR}"/*.c "${source_dir}/"
-	cp -r "${SCRIPT_DIR}"/Makefile "${source_dir}/"
-	cp -r "${SCRIPT_DIR}"/dkms.conf "${source_dir}/"
-	cp -r "${SCRIPT_DIR}"/*.dts "${source_dir}/"
+	cp "${SCRIPT_DIR}"/pamir-ai-eink-*.c "${source_dir}/" 2>/dev/null || true
+	cp "${SCRIPT_DIR}"/pamir-ai-eink-*.h "${source_dir}/" 2>/dev/null || true
+	cp "${SCRIPT_DIR}"/Makefile "${source_dir}/"
+	cp "${SCRIPT_DIR}"/dkms.conf "${source_dir}/"
+	cp "${SCRIPT_DIR}"/*.dts "${source_dir}/" 2>/dev/null || true
+	cp "${SCRIPT_DIR}"/README.md "${source_dir}/" 2>/dev/null || true
+	
+	# Copy examples if they exist
+	if [ -d "${SCRIPT_DIR}/examples" ]; then
+		cp -r "${SCRIPT_DIR}/examples" "${source_dir}/"
+	fi
 
 	# Copy debian packaging files
 	cp -r "${SCRIPT_DIR}"/debian "${source_dir}/"
