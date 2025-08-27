@@ -1,0 +1,29 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	# No configuration needed for DKMS modules
+
+override_dh_auto_build:
+	# DKMS modules are built at install time
+
+override_dh_auto_test:
+	# No tests to run
+
+override_dh_auto_install:
+	# Install DKMS source files
+	install -d debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0
+	install -m 644 *.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 Makefile debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 dkms.conf debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	install -m 644 *.dts debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
+	# Install documentation
+	# install -d debian/pamir-ai-eink-dkms/usr/share/doc/pamir-ai-eink-dkms
+	# install -m 644 README.md debian/pamir-ai-eink-dkms/usr/share/doc/pamir-ai-eink-dkms/
+
+override_dh_installdeb:
+	dh_installdeb
+	# Fix the changelog date
+	sed -i "s/\$$(date -R)/$$(date -R)/" debian/pamir-ai-eink-dkms/usr/share/doc/pamir-ai-eink-dkms/changelog.Debian.gz || true

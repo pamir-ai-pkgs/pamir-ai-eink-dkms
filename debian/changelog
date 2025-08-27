@@ -1,0 +1,5 @@
+pamir-ai-eink-dkms (1.0.0-1) unstable; urgency=medium
+
+  * Initial release of PamirAI Incorporated E-Ink FB driver
+
+ -- PamirAI Incorporated <founders@pamir.ai>  $(date -R)

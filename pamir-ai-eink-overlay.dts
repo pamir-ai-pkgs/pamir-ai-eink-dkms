@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Device Tree overlay for Pamir AI E-Ink FB Module
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2712";
+
+	fragment@0 {
+		target = <&spi0>;
+		__overlay__ {
+			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			epd@0 {
+				compatible = "pamir-ai,eink-display";
+				reg = <0>;	/* SPI chip-select 0 (/dev/spidev0.0) */
+				spi-max-frequency = <50000000>;
+				dc-gpios = <&gpio 7 0>;
+				reset-gpios = <&gpio 13 0>;
+				busy-gpios = <&gpio 9 0>;
+				width = <128>;
+				height = <250>;
+
+				status = "okay";
+			};
+		};
+	};
+};
