@@ -28,3 +28,6 @@ Module.symvers
 
 # Device tree compiled overlays
 *.dtbo
+
+# Tests
+eink_test

@@ -1,0 +1,15 @@
+# Makefile for E-Ink test program
+
+CC = gcc
+CFLAGS = -Wall -O2
+TARGET = eink_test
+
+all: $(TARGET)
+
+$(TARGET): eink_test.c pamir-ai-eink.h
+	$(CC) $(CFLAGS) -o $(TARGET) eink_test.c
+
+clean:
+	rm -f $(TARGET)
+
+.PHONY: all clean
