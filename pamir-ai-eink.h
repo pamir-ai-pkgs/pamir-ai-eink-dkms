@@ -19,6 +19,7 @@
 #define EPD_IOC_UPDATE_DISPLAY		_IO(EPD_IOC_MAGIC, 4)
 #define EPD_IOC_DEEP_SLEEP		_IO(EPD_IOC_MAGIC, 5)
 #define EPD_IOC_SET_BASE_MAP		_IOW(EPD_IOC_MAGIC, 6, void *)
+#define EPD_IOC_RESET			_IO(EPD_IOC_MAGIC, 7)
 
 /**
  * enum epd_update_mode - Display update modes

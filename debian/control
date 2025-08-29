@@ -5,7 +5,9 @@ Maintainer: PamirAI Incorporated <founders@pamir.ai>
 Standards-Version: 4.6.0
 Build-Depends: debhelper-compat (= 13),
                dkms,
-               device-tree-compiler
+               device-tree-compiler,
+               gcc-aarch64-linux-gnu [!arm64],
+               libc6-dev-arm64-cross [!arm64]
 Homepage: https://github.com/pamir-ai/pamir-ai-eink-dkms
 Vcs-Git: https://github.com/pamir-ai/pamir-ai-eink-dkms.git
 Vcs-Browser: https://github.com/pamir-ai/pamir-ai-eink-dkms
@@ -16,7 +18,7 @@ Depends: ${misc:Depends},
          dkms,
          device-tree-compiler,
          linux-headers-rpi-2712
-Recommends:
+Recommends: pamir-ai-eink-tests
 Suggests:
 Description: Pamir AI E-Ink Display Driver (DKMS)
  This package provides a DKMS (Dynamic Kernel Module Support) driver
@@ -31,3 +33,22 @@ Description: Pamir AI E-Ink Display Driver (DKMS)
   - Deep sleep mode for power efficiency
  .
  Compatible with Raspberry Pi CM5 and other SPI-enabled devices.
+
+Package: pamir-ai-eink-tests
+Architecture: arm64
+Depends: ${misc:Depends},
+         ${shlibs:Depends},
+         python3,
+         python3-pil,
+         python3-requests
+Description: Test programs for Pamir AI E-Ink Display Driver
+ This package provides test programs and examples for the Pamir AI
+ E-Ink display driver, including:
+ .
+  - Real-time clock display
+  - Weather dashboard
+  - System monitor with graphs
+  - E-book reader
+  - Various demonstration programs
+ .
+ Test programs are installed to /opt/distiller-eink-tests/

@@ -94,6 +94,13 @@ epd_partial_update(struct epd_dev *epd)
 	u32 x_bytes, y;
 	int ret;
 
+	/* Check if display is initialized */
+	if (!epd->initialized) {
+		dev_err(&epd->spi->dev,
+			"Display not initialized, cannot perform partial update\n");
+		return -ENODEV;
+	}
+
 	if (!epd->partial_area_set) {
 		/* If no area set, do full screen partial update */
 		area->x = 0;
@@ -115,14 +122,6 @@ epd_partial_update(struct epd_dev *epd)
 			"Partial update area exceeds display bounds\n");
 		return -EINVAL;
 	}
-
-	/* Hardware reset to prevent background color change */
-	gpiod_set_value_cansleep(epd->reset_gpio, 0);
-	usleep_range(EPD_RESET_DELAY_MS * 1000,
-		     EPD_RESET_DELAY_MS * 1000 + 1000);
-	gpiod_set_value_cansleep(epd->reset_gpio, 1);
-	usleep_range(EPD_RESET_DELAY_MS * 1000,
-		     EPD_RESET_DELAY_MS * 1000 + 1000);
 
 	/* Lock border to prevent flashing */
 	ret = epd_send_cmd(epd, EPD_CMD_BORDER_WAVEFORM);
@@ -290,6 +289,10 @@ epd_deep_sleep(struct epd_dev *epd)
 	ret = epd_send_cmd(epd, EPD_CMD_DEEP_SLEEP_MODE);
 	if (!ret)
 		ret = epd_send_data_buf(epd, &data, 1);
+
+	/* Display is no longer initialized after deep sleep */
+	if (!ret)
+		epd->initialized = false;
 
 	mutex_unlock(&epd->lock);
 

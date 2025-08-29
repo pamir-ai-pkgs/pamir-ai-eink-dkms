@@ -21,7 +21,7 @@ The `pamir-ai-eink` driver is a fully-featured framebuffer driver for e-ink disp
 ### Display Controller
 - **Controller**: SSD1681 or compatible
 - **Interface**: SPI (up to 40MHz)
-- **Resolution**: Configurable via device tree (tested up to 250x122)
+- **Resolution**: Configurable via device tree (tested with 128x250)
 - **Color Depth**: Monochrome (1-bit per pixel)
 - **Refresh Time**: ~2-4 seconds (full), ~500ms (partial)
 
@@ -123,8 +123,8 @@ Create a file `pamir-ai-eink-overlay.dts`:
                 reg = <0>;
                 spi-max-frequency = <20000000>;
 
-                width = <250>;
-                height = <122>;
+                width = <128>;
+                height = <250>;
 
                 reset-gpios = <&gpio 23 0>;
                 dc-gpios = <&gpio 24 0>;
@@ -275,8 +275,8 @@ EPD_MODE_PARTIAL = 1
 def draw_to_eink():
     # Open framebuffer
     with open('/dev/fb0', 'r+b') as fb:
-        # Get framebuffer info (simplified, assumes 250x122)
-        width, height = 250, 122
+        # Get framebuffer info (simplified, assumes 128x250)
+        width, height = 128, 250
 
         # Create image
         img = Image.new('1', (width, height), 1)  # 1-bit, white background
@@ -425,7 +425,7 @@ ioctl(fd, EPD_IOC_SET_BASE_MAP, NULL);
 
 ### Memory Usage
 - Framebuffer size: `(width / 8) * height` bytes
-- Example: 250x122 display uses ~3.8KB
+- Example: 128x250 display uses ~4KB
 - Double buffering in base map mode doubles RAM usage
 
 ### Power Management
@@ -436,7 +436,7 @@ ioctl(fd, EPD_IOC_SET_BASE_MAP, NULL);
 ### SPI Performance
 - Maximum SPI clock: 20MHz (controller limitation)
 - Actual throughput: ~2.5MB/s theoretical maximum
-- Full screen update data transfer: ~50ms for 250x122 display
+- Full screen update data transfer: ~50ms for 128x250 display
 
 ## Troubleshooting
 

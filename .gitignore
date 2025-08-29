@@ -31,3 +31,8 @@ Module.symvers
 
 # Tests
 eink_test
+
+# Example binaries
+examples/eink_clock
+examples/eink_demo
+examples/eink_monitor

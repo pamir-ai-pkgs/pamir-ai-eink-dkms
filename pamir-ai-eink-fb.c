@@ -61,6 +61,10 @@ epd_fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
 
 		mutex_lock(&epd->lock);
 		epd->update_mode = mode;
+		/* Clear partial area settings when switching to full mode */
+		if (mode == EPD_MODE_FULL) {
+			epd->partial_area_set = false;
+		}
 		mutex_unlock(&epd->lock);
 		break;
 
@@ -107,6 +111,22 @@ epd_fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
 		epd->update_mode = EPD_MODE_BASE_MAP;
 		mutex_unlock(&epd->lock);
 		ret = epd_display_flush(epd);
+		break;
+
+	case EPD_IOC_RESET:
+		/* Reset display hardware and reinitialize */
+		ret = epd_hw_init(epd);
+		if (!ret) {
+			/* Clear partial area settings after reset */
+			mutex_lock(&epd->lock);
+			epd->partial_area_set = false;
+			epd->update_mode = EPD_MODE_FULL;
+			epd->initialized = true;
+			mutex_unlock(&epd->lock);
+			dev_info(&epd->spi->dev, "Display reset completed\n");
+		} else {
+			epd->initialized = false;
+		}
 		break;
 
 	default:

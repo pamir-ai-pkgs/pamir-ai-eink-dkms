@@ -18,6 +18,10 @@ from PIL import Image, ImageDraw
 # IOCTL constants
 EPD_IOC_MAGIC = ord("E")
 
+# Framebuffer IOCTL constants for getting screen info
+FBIOGET_VSCREENINFO = 0x4600
+FBIOGET_FSCREENINFO = 0x4602
+
 
 # IOCTL command construction
 def _IOW(type, nr, size):
@@ -39,6 +43,7 @@ EPD_IOC_SET_PARTIAL_AREA = _IOW(EPD_IOC_MAGIC, 3, 8)  # 4 * u16 = 8
 EPD_IOC_UPDATE_DISPLAY = _IO(EPD_IOC_MAGIC, 4)
 EPD_IOC_DEEP_SLEEP = _IO(EPD_IOC_MAGIC, 5)
 EPD_IOC_SET_BASE_MAP = _IOW(EPD_IOC_MAGIC, 6, 8)  # pointer = 8
+EPD_IOC_RESET = _IO(EPD_IOC_MAGIC, 7)  # Reset display
 
 # Update modes
 EPD_MODE_FULL = 0
@@ -58,8 +63,8 @@ class EInkDisplay:
         self.fb_device = fb_device
         self.fb_file = None
         self.fb_mmap = None
-        self.width = 250  # Default, will be updated
-        self.height = 122  # Default, will be updated
+        self.width = 128  # Default, will be updated
+        self.height = 250  # Default, will be updated
         self.bytes_per_line = 0
 
         self._open_framebuffer()
@@ -69,11 +74,20 @@ class EInkDisplay:
         # Open framebuffer
         self.fb_file = open(self.fb_device, "r+b")
 
-        # Get framebuffer info (simplified - assumes known dimensions)
-        # In a real implementation, you would use FBIOGET_VSCREENINFO
-        # and FBIOGET_FSCREENINFO ioctls to get actual dimensions
-        self.width = 250
-        self.height = 122
+        # Get framebuffer variable screen info to read dimensions
+        # The structure is complex, but we only need xres and yres at the beginning
+        vinfo = fcntl.ioctl(self.fb_file, FBIOGET_VSCREENINFO, b"\x00" * 160)
+
+        # Parse xres and yres from the structure (first two 32-bit values)
+        self.width, self.height = struct.unpack("II", vinfo[:8])
+
+        # Fallback to defaults if we get invalid values
+        if self.width == 0 or self.height == 0:
+            print("Warning: Could not read display dimensions, using defaults")
+            self.width = 128
+            self.height = 250
+
+        print(f"Display dimensions detected: {self.width}x{self.height}")
         self.bytes_per_line = (self.width + 7) // 8
 
         # Calculate framebuffer size
@@ -115,6 +129,19 @@ class EInkDisplay:
     def deep_sleep(self):
         """Enter deep sleep mode."""
         fcntl.ioctl(self.fb_file, EPD_IOC_DEEP_SLEEP)
+
+    def reset_display(self):
+        """Reset the display hardware.
+
+        Use this to recover from stuck display states.
+        """
+        try:
+            fcntl.ioctl(self.fb_file, EPD_IOC_RESET)
+            print("Display reset successful")
+            # After reset, default to full update mode
+            self.set_update_mode(EPD_MODE_FULL)
+        except IOError as e:
+            print(f"Display reset failed: {e}")
 
     def draw_image(self, image, x=0, y=0):
         """Draw a PIL Image to the display.
@@ -218,40 +245,80 @@ def demo_partial_update():
     print("\n=== Partial Update Demo ===")
 
     with EInkDisplay() as display:
-        # First do a full update to set the base
-        display.set_update_mode(EPD_MODE_FULL)
-        display.clear(255)
+        try:
+            # First do a full update to set the base
+            display.set_update_mode(EPD_MODE_FULL)
+            display.clear(255)
 
-        # Create base image
-        img = Image.new("1", (display.width, display.height), 1)
-        draw = ImageDraw.Draw(img)
-        draw.text((10, 10), "Partial Update Demo", fill=0)
-        draw.rectangle((0, 0, display.width - 1, display.height - 1), outline=0)
+            # Create base image
+            img = Image.new("1", (display.width, display.height), 1)
+            draw = ImageDraw.Draw(img)
+            draw.text((10, 10), "Partial Update Demo", fill=0)
+            draw.rectangle((0, 0, display.width - 1, display.height - 1), outline=0)
 
-        display.draw_image(img)
-        display.update_display()
-        time.sleep(2)
-
-        # Switch to partial mode
-        display.set_update_mode(EPD_MODE_PARTIAL)
-
-        # Update counter in a small area
-        for i in range(5):
-            # Set partial area (must be byte-aligned)
-            display.set_partial_area(80, 50, 80, 32)
-
-            # Create small image for counter
-            counter_img = Image.new("1", (80, 32), 1)
-            counter_draw = ImageDraw.Draw(counter_img)
-            counter_draw.rectangle((0, 0, 79, 31), outline=0)
-            counter_draw.text((10, 8), f"Count: {i}", fill=0)
-
-            # Draw to display
-            display.draw_image(counter_img, 80, 50)
+            display.draw_image(img)
             display.update_display()
+            time.sleep(2)
 
-            print(f"Partial update {i}")
-            time.sleep(1)
+            # Switch to partial mode
+            display.set_update_mode(EPD_MODE_PARTIAL)
+
+            # Update counter in a small area
+            # Adjust coordinates to fit within actual display bounds
+            # For 128x250 display, use safe coordinates
+            partial_x = 16  # Must be multiple of 8
+            partial_y = 100
+            partial_width = 64  # Must be multiple of 8
+            partial_height = 32
+
+            # Verify bounds
+            if partial_x + partial_width > display.width:
+                partial_x = 0
+                partial_width = min(80, display.width)
+            if partial_y + partial_height > display.height:
+                partial_y = 0
+                partial_height = min(32, display.height)
+
+            for i in range(5):
+                try:
+                    # Set partial area (must be byte-aligned)
+                    display.set_partial_area(
+                        partial_x, partial_y, partial_width, partial_height
+                    )
+
+                    # Create small image for counter
+                    counter_img = Image.new("1", (partial_width, partial_height), 1)
+                    counter_draw = ImageDraw.Draw(counter_img)
+                    counter_draw.rectangle(
+                        (0, 0, partial_width - 1, partial_height - 1), outline=0
+                    )
+                    counter_draw.text((10, 8), f"Count: {i}", fill=0)
+
+                    # Draw to display
+                    display.draw_image(counter_img, partial_x, partial_y)
+                    display.update_display()
+
+                    print(f"Partial update {i} successful")
+                    time.sleep(1)
+
+                except IOError as e:
+                    print(f"Partial update {i} failed: {e}")
+                    print("Attempting display reset...")
+                    display.reset_display()
+                    # Try full update mode as fallback
+                    display.set_update_mode(EPD_MODE_FULL)
+                    display.update_display()
+                    break
+
+        except Exception as e:
+            print(f"Error during partial update demo: {e}")
+            print("Resetting display...")
+            display.reset_display()
+        
+        finally:
+            # Always clean up after partial updates
+            print("Cleaning up partial update state...")
+            display.set_update_mode(EPD_MODE_FULL)
 
 
 def demo_patterns():
@@ -291,6 +358,16 @@ def main():
     print("===================================\n")
 
     try:
+        # Create display and optionally reset if needed
+        with EInkDisplay() as display:
+            print(f"Display dimensions: {display.width}x{display.height}")
+
+            # Option to reset display at start (useful if display was stuck)
+            response = input("Reset display before starting? (y/N): ").lower()
+            if response == "y":
+                display.reset_display()
+                time.sleep(1)
+
         demo_full_update()
         demo_partial_update()
         demo_patterns()
@@ -306,6 +383,7 @@ def main():
         print("  sudo usermod -a -G video $USER")
     except Exception as e:
         print(f"Error: {e}")
+        print("\nIf the display is stuck, try running with reset option.")
 
 
 if __name__ == "__main__":

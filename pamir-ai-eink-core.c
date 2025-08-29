@@ -58,6 +58,7 @@ epd_probe(struct spi_device *spi)
 	/* Initialize update mode to full refresh */
 	epd->update_mode = EPD_MODE_FULL;
 	epd->partial_area_set = false;
+	epd->initialized = false;
 
 	/* Get GPIOs */
 	epd->reset_gpio = devm_gpiod_get_optional(&spi->dev, "reset",
@@ -129,6 +130,7 @@ epd_probe(struct spi_device *spi)
 			ret);
 		goto err_unregister_fb;
 	}
+	epd->initialized = true;
 
 	/* Create sysfs attributes */
 	ret = sysfs_create_group(&spi->dev.kobj, &epd_attr_group);
