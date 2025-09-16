@@ -1,14 +1,14 @@
 pamir-ai-eink-dkms (1.0.0-2) unstable; urgency=medium
 
-  * Major refactoring: Split monolithic driver into multiple files
-  * Added comprehensive update mode support (full, partial, base map)
-  * Implemented proper mmap support using vmalloc_user
-  * Added IOCTL interface for advanced control
-  * Added sysfs interface for runtime configuration
-  * Fixed all kernel coding style issues
-  * Added deep sleep mode support
-  * Improved error handling and recovery
-  * Added comprehensive documentation and examples
+  * Split driver into modular components (core, hw, display, fb, sysfs)
+  * Added three update modes: full refresh, partial update, base map
+  * Implemented mmap support with vmalloc_user for framebuffer access
+  * Added IOCTL interface for userspace control
+  * Added sysfs attributes for runtime configuration
+  * Fixed kernel coding style compliance issues
+  * Added SSD1680 deep sleep mode
+  * Improved SPI error handling with retry logic
+  * Added C and Python example programs
 
  -- Pamir AI <support@pamir.ai>  Thu, 28 Aug 2025 01:09:58 +0530
 

@@ -10,11 +10,19 @@ case "$1" in
                 rm -f "/usr/local/bin/eink-$basename" 2>/dev/null || true
             fi
         done
+
+        # Clean up compiled binaries (keep source files)
+        # This ensures a clean state for upgrades
+        if [ -d /opt/distiller-eink-tests/bin ]; then
+            for prog in eink_demo eink_clock eink_monitor; do
+                rm -f "/opt/distiller-eink-tests/bin/$prog" 2>/dev/null || true
+            done
+        fi
         ;;
-    
+
     failed-upgrade)
         ;;
-    
+
     *)
         echo "prerm called with unknown argument \`$1'" >&2
         exit 1

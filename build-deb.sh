@@ -66,8 +66,6 @@ check_dependencies() {
 		"device-tree-compiler"
 		"fakeroot"
 		"dpkg-dev"
-		"gcc-aarch64-linux-gnu"
-		"libc6-dev-arm64-cross"
 	)
 
 	for package in "${required_packages[@]}"; do
@@ -130,63 +128,9 @@ prepare_source() {
 
 	# Fix changelog date
 	sed -i "s/\$(date -R)/$(date -R)/" "${source_dir}/debian/changelog"
-	
-	# Cross-compile test programs for ARM64 BEFORE packaging
-	print_info "Cross-compiling test programs for ARM64..."
-	if [ -d "${source_dir}/examples" ]; then
-		# Copy header to examples directory
-		cp "${source_dir}/pamir-ai-eink.h" "${source_dir}/examples/" 2>/dev/null || true
-		
-		# Cross-compile each program
-		print_info "Compiling eink_demo..."
-		if aarch64-linux-gnu-gcc -Wall -O2 -I"${source_dir}/examples" \
-			-o "${source_dir}/examples/eink_demo" \
-			"${source_dir}/examples/eink_demo.c" -lm 2>/dev/null; then
-			print_success "  eink_demo compiled"
-		else
-			print_warning "  Failed to compile eink_demo"
-		fi
-		
-		print_info "Compiling eink_clock..."
-		if aarch64-linux-gnu-gcc -Wall -O2 -I"${source_dir}/examples" \
-			-o "${source_dir}/examples/eink_clock" \
-			"${source_dir}/examples/eink_clock.c" -lm 2>/dev/null; then
-			print_success "  eink_clock compiled"
-		else
-			print_warning "  Failed to compile eink_clock"
-		fi
-		
-		print_info "Compiling eink_monitor..."
-		if aarch64-linux-gnu-gcc -Wall -O2 -I"${source_dir}/examples" \
-			-o "${source_dir}/examples/eink_monitor" \
-			"${source_dir}/examples/eink_monitor.c" -lm 2>/dev/null; then
-			print_success "  eink_monitor compiled"
-		else
-			print_warning "  Failed to compile eink_monitor"
-		fi
-		
-		# Strip the binaries to reduce size
-		print_info "Stripping binaries..."
-		aarch64-linux-gnu-strip "${source_dir}/examples/eink_demo" 2>/dev/null || true
-		aarch64-linux-gnu-strip "${source_dir}/examples/eink_clock" 2>/dev/null || true
-		aarch64-linux-gnu-strip "${source_dir}/examples/eink_monitor" 2>/dev/null || true
-		
-		# Verify the binaries are ARM64
-		if command -v file &>/dev/null; then
-			for binary in eink_demo eink_clock eink_monitor; do
-				if [ -f "${source_dir}/examples/${binary}" ]; then
-					file_type=$(file "${source_dir}/examples/${binary}" | grep -o "ARM aarch64" || true)
-					if [ -n "${file_type}" ]; then
-						print_success "  ${binary}: ARM64 binary confirmed"
-					fi
-				fi
-			done
-		fi
-		
-		print_success "Test programs compiled for ARM64"
-	else
-		print_warning "Examples directory not found, skipping compilation"
-	fi
+
+	# Note: Test programs will be compiled during installation on target device
+	print_info "Test programs will be compiled during package installation on ARM64 device"
 
 	print_success "Source directory prepared at ${source_dir}"
 }
@@ -201,9 +145,10 @@ build_package() {
 	cd "${source_dir}"
 
 	# Build the package
-	print_info "Running dpkg-buildpackage for ARM64 cross-compilation..."
+	print_info "Running dpkg-buildpackage..."
 	export DEB_BUILD_OPTIONS="nocheck"
-	if dpkg-buildpackage -us -uc -b -d -aarm64 --host-arch=arm64; then
+	# Build for 'all' architecture (DKMS) and 'arm64' for tests package
+	if dpkg-buildpackage -us -uc -b -d; then
 		print_success "Package built successfully"
 	else
 		print_error "Package build failed"

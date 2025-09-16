@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 set -e
 
@@ -24,16 +24,22 @@ remove | upgrade | deconfigure)
 	if [ -f "${CONFIG_FILE}" ]; then
 		echo "Removing device tree overlay configuration from ${CONFIG_FILE}..."
 
-		# Create a temporary file without the overlay lines
-		TEMP_FILE=$(mktemp)
+		# Create backup with proper error handling
+		if ! cp -a "${CONFIG_FILE}" "${CONFIG_FILE}.backup"; then
+			echo "Error: Failed to create backup of ${CONFIG_FILE}" >&2
+			exit 1
+		fi
 
-		# Remove the overlay line and the comment line
-		grep -v "^${OVERLAY_LINE}" "${CONFIG_FILE}" | grep -v "^${COMMENT_LINE}" >"${TEMP_FILE}"
-
-		# Replace the original file
-		mv "${TEMP_FILE}" "${CONFIG_FILE}"
-
-		echo "Device tree overlay configuration removed from ${CONFIG_FILE}"
+		# Remove overlay configuration using sed with atomic operation
+		if sed -i "/^${OVERLAY_LINE}/d; /^${COMMENT_LINE}/d" "${CONFIG_FILE}"; then
+			rm -f "${CONFIG_FILE}.backup"
+			echo "Device tree overlay configuration removed from ${CONFIG_FILE}"
+		else
+			# Restore from backup on failure
+			mv "${CONFIG_FILE}.backup" "${CONFIG_FILE}"
+			echo "Error: Failed to modify ${CONFIG_FILE}, restored from backup" >&2
+			exit 1
+		fi
 	else
 		echo "Warning: ${CONFIG_FILE} not found, skipping config removal"
 	fi

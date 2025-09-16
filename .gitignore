@@ -10,6 +10,7 @@ dist/
 *.dsc
 *.tar.*
 *.upload
+**/__pycache__
 
 # DKMS build artifacts
 *.o

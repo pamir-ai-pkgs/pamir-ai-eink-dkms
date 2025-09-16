@@ -7,15 +7,6 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 %:
 	dh $@
 
-override_dh_auto_configure:
-	# No configuration needed for DKMS modules
-
-override_dh_auto_build:
-	# No build needed - binaries are pre-compiled during packaging (build-deb.sh)
-
-override_dh_auto_test:
-	# Skip tests - testing handled on target device
-
 override_dh_auto_install:
 	# Install DKMS source files
 	install -d debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0
@@ -29,50 +20,46 @@ override_dh_auto_install:
 	install -m 644 Makefile debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
 	install -m 644 dkms.conf debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
 	install -m 644 *.dts debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/ || true
-	
+
 	# Install test programs to /opt/distiller-eink-tests
 	if [ -d examples ]; then \
 		install -d debian/pamir-ai-eink-tests/opt/distiller-eink-tests/bin && \
+		install -d debian/pamir-ai-eink-tests/opt/distiller-eink-tests/src && \
 		install -d debian/pamir-ai-eink-tests/opt/distiller-eink-tests/python && \
 		install -d debian/pamir-ai-eink-tests/opt/distiller-eink-tests/doc && \
-		for prog in eink_demo eink_clock eink_monitor; do \
+		for prog in eink_demo.c eink_clock.c eink_monitor.c; do \
 			if [ -f examples/$$prog ]; then \
-				echo "Installing $$prog binary..."; \
-				install -m 755 examples/$$prog debian/pamir-ai-eink-tests/opt/distiller-eink-tests/bin/; \
-			else \
-				echo "Warning: $$prog binary not found, skipping" >&2; \
+				echo "Installing $$prog source..."; \
+				install -m 644 examples/$$prog debian/pamir-ai-eink-tests/opt/distiller-eink-tests/src/; \
 			fi; \
 		done && \
-		for script in eink_demo.py eink_weather.py eink_reader.py; do \
+		if [ -f examples/Makefile ]; then \
+			install -m 644 examples/Makefile debian/pamir-ai-eink-tests/opt/distiller-eink-tests/src/; \
+		fi && \
+		for script in eink_demo.py eink_weather.py eink_reader.py eink_recovery.py eink_image.py gif.py eink_common.py; do \
 			if [ -f examples/$$script ]; then \
 				install -m 755 examples/$$script debian/pamir-ai-eink-tests/opt/distiller-eink-tests/python/; \
 			fi; \
 		done && \
+		if [ -f examples/requirements.txt ]; then \
+			install -m 644 examples/requirements.txt debian/pamir-ai-eink-tests/opt/distiller-eink-tests/python/; \
+		fi && \
 		if [ -f examples/README.md ]; then \
 			install -m 644 examples/README.md debian/pamir-ai-eink-tests/opt/distiller-eink-tests/doc/; \
 		fi && \
 		if [ -f pamir-ai-eink.h ]; then \
-			install -m 644 pamir-ai-eink.h debian/pamir-ai-eink-tests/opt/distiller-eink-tests/doc/; \
+			install -m 644 pamir-ai-eink.h debian/pamir-ai-eink-tests/opt/distiller-eink-tests/src/; \
 		fi; \
 	fi
-	
+
 	# Create wrapper scripts for Python programs with proper shebang
-	for script in eink_demo.py eink_weather.py eink_reader.py; do \
+	for script in eink_demo.py eink_weather.py eink_reader.py eink_recovery.py eink_image.py gif.py; do \
 		if [ -f examples/$$script ]; then \
 			echo "#!/bin/sh" > debian/pamir-ai-eink-tests/opt/distiller-eink-tests/bin/$${script%.py} && \
 			echo "exec python3 /opt/distiller-eink-tests/python/$$script \"\$$@\"" >> debian/pamir-ai-eink-tests/opt/distiller-eink-tests/bin/$${script%.py} && \
 			chmod 755 debian/pamir-ai-eink-tests/opt/distiller-eink-tests/bin/$${script%.py}; \
 		fi; \
 	done
-
-override_dh_strip:
-	# Binaries already stripped during build-deb.sh
-	# Skip stripping to preserve pre-compiled binaries
-
-override_dh_shlibdeps:
-	# For cross-compiled binaries, ignore missing library info
-	# This allows building on x86_64 for ARM64 targets
-	dh_shlibdeps -ppamir-ai-eink-tests --dpkg-shlibdeps-params=--ignore-missing-info || true
 
 override_dh_installdeb:
 	dh_installdeb
@@ -85,4 +72,3 @@ override_dh_builddeb:
 
 clean:
 	dh_clean
-	# Note: Test program cleanup handled by build-deb.sh

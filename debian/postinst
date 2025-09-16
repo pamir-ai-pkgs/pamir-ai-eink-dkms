@@ -12,28 +12,20 @@ case "$1" in
 configure)
 	echo "Configuring pamir-ai-eink-dkms..."
 
-	# Add to DKMS
-	if [ -f "${DKMS_SOURCE_DIR}/dkms.conf" ]; then
-		echo "Adding ${PACKAGE_NAME} to DKMS..."
-		dkms add ${DKMS_VERSIONS} -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}" || true
+	if [ ! -f "${DKMS_SOURCE_DIR}/dkms.conf" ]; then
+		echo "Error: DKMS configuration file not found at ${DKMS_SOURCE_DIR}/dkms.conf"
+		exit 1
+	fi
 
-		# Build the module
-		echo "Building ${PACKAGE_NAME} DKMS module..."
-		if dkms build ${DKMS_VERSIONS} -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}"; then
-			echo "Successfully built ${PACKAGE_NAME} modules"
+	dkms add -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}" || true
 
-			# Install the module
-			echo "Installing ${PACKAGE_NAME} DKMS module..."
-			if dkms install ${DKMS_VERSIONS} -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}"; then
-				echo "Successfully installed ${PACKAGE_NAME} modules"
-			else
-				echo "Warning: Failed to install ${PACKAGE_NAME} modules"
-			fi
-		else
-			echo "Warning: Failed to build ${PACKAGE_NAME} modules"
+	if dkms build -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}"; then
+		# Install the module
+		if ! dkms install -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}"; then
+			echo "Warning: Failed to install ${PACKAGE_NAME} modules"
 		fi
 	else
-		echo "Error: DKMS configuration file not found at ${DKMS_SOURCE_DIR}/dkms.conf"
+		echo "Warning: Failed to build ${PACKAGE_NAME} modules"
 	fi
 
 	# Compile and install device tree overlay
@@ -41,34 +33,20 @@ configure)
 		echo "Compiling device tree overlay..."
 
 		# Check if device-tree-compiler is available
-		if command -v dtc &>/dev/null; then
-			# Create overlay directory if it doesn't exist (only if parent exists)
-			if [ -d "/boot/firmware" ]; then
-				mkdir -p "$(dirname "${OVERLAY_DEST}")"
-			else
-				echo "Warning: /boot/firmware not found, skipping overlay compilation"
-				OVERLAY_SOURCE=""
-			fi
-
-			# Compile the overlay (only if source still valid)
-			if [ -n "${OVERLAY_SOURCE}" ] && dtc -@ -I dts -O dtb -o "${OVERLAY_DEST}" "${OVERLAY_SOURCE}"; then
-				echo "Device tree overlay compiled and installed to ${OVERLAY_DEST}"
-			elif [ -n "${OVERLAY_SOURCE}" ]; then
+		if command -v dtc &>/dev/null &&
+			[ -d "/boot/firmware" ] &&
+			mkdir -p "$(dirname "${OVERLAY_DEST}")"; then
+			if ! dtc -@ -I dts -O dtb -o "${OVERLAY_DEST}" "${OVERLAY_SOURCE}"; then
 				echo "Warning: Failed to compile device tree overlay"
 			fi
 		else
-			echo "Warning: device-tree-compiler (dtc) not found, skipping overlay compilation"
+			echo "Warning: Failed to install device tree overlay"
 		fi
-	else
-		echo "Warning: Device tree overlay source not found"
 	fi
 
-	echo "Updating module dependencies..."
-	depmod -a || true
+	# Update module dependencies
 	if [ -d "/lib/modules/$(uname -r)" ]; then
 		depmod -a || true
-	else
-		echo "Skipping depmod in cross-compilation environment"
 	fi
 
 	# Auto-configure device tree overlay in config.txt

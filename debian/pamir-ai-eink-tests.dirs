@@ -1,4 +1,5 @@
 opt/distiller-eink-tests
 opt/distiller-eink-tests/bin
+opt/distiller-eink-tests/src
 opt/distiller-eink-tests/python
 opt/distiller-eink-tests/doc
