@@ -51,7 +51,7 @@ sudo apt-get install device-tree-compiler
 
 ```bash
 # Clone the repository
-git clone https://github.com/pamir-ai/pamir-ai-eink-dkms
+git clone https://github.com/pamir-ai-pkgs/pamir-ai-eink-dkms
 cd pamir-ai-eink-dkms
 
 # Build the kernel module
@@ -508,7 +508,7 @@ This driver is licensed under GPL v2. See the COPYING file for details.
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/pamir-ai/pamir-ai-eink-dkms/issues
+- GitHub Issues: https://github.com/pamir-ai-pkgs/pamir-ai-eink-dkms/issues
 - Email: support@pamir.ai
 
 ## Authors

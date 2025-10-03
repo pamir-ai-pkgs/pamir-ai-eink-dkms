@@ -309,5 +309,5 @@ All examples are licensed under GPL v2. See the main LICENSE file for details.
 ## Support
 
 For issues with examples:
-- GitHub Issues: https://github.com/pamir-ai/pamir-ai-eink-dkms/issues
+- GitHub Issues: https://github.com/pamir-ai-pkgs/pamir-ai-eink-dkms/issues
 - Email: support@pamir.ai
