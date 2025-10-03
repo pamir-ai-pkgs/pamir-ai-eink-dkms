@@ -7,7 +7,6 @@ This directory contains comprehensive examples demonstrating all features and up
 Each example showcases different aspects of the e-ink display technology and demonstrates best practices for:
 - **Update Mode Selection**: When to use full, partial, or base map modes
 - **Byte Alignment**: Proper handling of x-coordinate and width requirements (multiples of 8)
-- **Power Management**: Efficient use of deep sleep mode
 - **Ghosting Prevention**: Strategic full refreshes between partial updates
 
 ## Examples
@@ -99,7 +98,6 @@ Text reader with pagination and navigation.
 **Update Modes Used:**
 - **Full Update**: Page turns for best text quality
 - **Partial Update**: Menu and navigation elements
-- **Deep Sleep**: When idle to save power
 
 **Run:**
 ```bash
@@ -150,7 +148,6 @@ Standalone tool to reset and recover a stuck e-ink display.
 - Hardware reset functionality
 - Display clearing (all white)
 - Recovery from stuck states
-- Optional deep sleep after recovery
 
 **Use Cases:**
 - Display stuck after failed partial update
@@ -236,15 +233,7 @@ if (update_counter % 60 == 0) {
 }
 ```
 
-### 3. Power Management
-Use deep sleep when display is idle:
-```c
-if (idle_time > IDLE_THRESHOLD) {
-    ioctl(fbfd, EPD_IOC_DEEP_SLEEP);
-}
-```
-
-### 4. Error Handling
+### 3. Error Handling
 Always check IOCTL return values:
 ```c
 if (ioctl(fbfd, EPD_IOC_SET_UPDATE_MODE, &mode) < 0) {

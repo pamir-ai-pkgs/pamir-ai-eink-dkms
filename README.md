@@ -4,7 +4,7 @@ A Linux kernel driver for the Pamir AI E-Ink display, providing high-performance
 
 ## Overview
 
-The `pamir-ai-eink` driver is a fully-featured framebuffer driver for e-ink displays based on the SSD1681 controller. It provides seamless integration with the Linux framebuffer subsystem while offering specialized e-ink functionality including partial updates, deep sleep mode, and multiple refresh strategies.
+The `pamir-ai-eink` driver is a fully-featured framebuffer driver for e-ink displays based on the SSD1680 controller. It provides seamless integration with the Linux framebuffer subsystem while offering specialized e-ink functionality including partial updates, deep sleep mode, and multiple refresh strategies.
 
 ### Key Features
 
@@ -19,7 +19,7 @@ The `pamir-ai-eink` driver is a fully-featured framebuffer driver for e-ink disp
 ## Hardware Specifications
 
 ### Display Controller
-- **Controller**: SSD1681 or compatible
+- **Controller**: SSD1680 or compatible
 - **Interface**: SPI (up to 40MHz)
 - **Resolution**: Configurable via device tree (tested with 128x250)
 - **Color Depth**: Monochrome (1-bit per pixel)
@@ -518,5 +518,5 @@ Pamir AI <support@pamir.ai>
 ## Acknowledgments
 
 - Linux kernel framebuffer subsystem maintainers
-- SSD1681 controller documentation contributors
+- SSD1680 controller documentation contributors
 - E-ink display technology pioneers
