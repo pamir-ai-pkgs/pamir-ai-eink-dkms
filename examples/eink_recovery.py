@@ -1,121 +1,151 @@
 #!/usr/bin/env python3
-"""
-eink_recovery.py - Recovery tool for stuck Pamir AI E-Ink display
-
-Copyright (C) 2025 Pamir AI
-License: GPL v2
-
-Use this tool to reset and recover a stuck e-ink display.
-"""
-
-import fcntl
-import struct
 import sys
 import time
-
-# IOCTL constants
-EPD_IOC_MAGIC = ord("E")
-
-
-def _IOW(type, nr, size):
-    return (1 << 30) | (type << 8) | nr | (size << 16)
-
-
-def _IO(type, nr):
-    return (0 << 30) | (type << 8) | nr
-
-
-# IOCTL commands
-EPD_IOC_SET_UPDATE_MODE = _IOW(EPD_IOC_MAGIC, 1, 4)
-EPD_IOC_UPDATE_DISPLAY = _IO(EPD_IOC_MAGIC, 4)
-EPD_IOC_DEEP_SLEEP = _IO(EPD_IOC_MAGIC, 5)
-EPD_IOC_RESET = _IO(EPD_IOC_MAGIC, 7)
-
-# Update modes
-EPD_MODE_FULL = 0
+from eink_common import (
+    EInkDisplay,
+    EPD_MODE_FULL,
+    EPD_MODE_BASE_MAP,
+)
 
 
 def reset_display(fb_device="/dev/fb0"):
-    """Reset the e-ink display and clear it."""
+    """
+    Perform display recovery.
+    """
     try:
-        print(f"Opening framebuffer device: {fb_device}")
-        with open(fb_device, "r+b") as fb_file:
-            # Step 1: Reset the display hardware
-            print("Resetting display hardware...")
-            fcntl.ioctl(fb_file, EPD_IOC_RESET)
-            time.sleep(1)
+        print(f"Opening display device: {fb_device}")
+        with EInkDisplay(fb_device) as display:
+            print("\n=== Starting display recovery ===")
 
-            # Step 2: Set to full update mode
-            print("Setting full update mode...")
-            mode_bytes = struct.pack("i", EPD_MODE_FULL)
-            fcntl.ioctl(fb_file, EPD_IOC_SET_UPDATE_MODE, mode_bytes)
+            total_steps = 9
 
-            # Step 3: Clear the display (write all white)
-            print("Clearing display...")
-            # Get display size (assuming 128x250 or reading from device)
-            width = 128
-            height = 250
-            bytes_per_line = (width + 7) // 8
-            fb_size = bytes_per_line * height
+            step = 0
 
-            # Write all white (0xFF)
-            fb_file.seek(0)
-            fb_file.write(b"\xff" * fb_size)
-            fb_file.flush()
+            # Step 1: Hardware reset using kernel IOCTL
+            step += 1
+            print(f"[{step}/{total_steps}] Performing hardware reset...")
+            try:
+                display.reset_display()
+                time.sleep(1)
+            except IOError as e:
+                print(f"  Regular reset failed ({e}), trying force reset via sysfs...")
+                # Try force reset through sysfs if regular reset fails
+                try:
+                    with open("/sys/bus/spi/devices/spi0.0/force_reset", "w") as f:
+                        f.write("1")
+                    print("  Force reset successful!")
+                    time.sleep(1)
+                except Exception as sysfs_err:
+                    print(f"  Force reset also failed: {sysfs_err}")
+                    raise e
 
-            # Step 4: Trigger display update
-            print("Triggering display update...")
-            fcntl.ioctl(fb_file, EPD_IOC_UPDATE_DISPLAY)
+            # Step 2: Set full update mode for thorough refresh
+            step += 1
+            print(f"[{step}/{total_steps}] Setting full update mode...")
+            display.set_update_mode(EPD_MODE_FULL)
+
+            # Step 3: Clear to black first (inverts all pixels)
+            step += 1
+            print(f"[{step}/{total_steps}] Clearing display to black...")
+            display.clear(0)  # Black
+            display.update_display()
             time.sleep(2)
 
-            print("Display recovery complete!")
-            print("The display has been reset and cleared.")
+            # Step 4: Set black as base map to clear RED RAM
+            step += 1
+            print(f"[{step}/{total_steps}] Setting black screen as base map...")
+            display.set_update_mode(EPD_MODE_BASE_MAP)
+            display.update_display()
+            time.sleep(2)
 
-            # Optional: Ask if user wants to put display to sleep
+            # Step 5: Clear to white (inverts all pixels again)
+            step += 1
+            print(f"[{step}/{total_steps}] Clearing display to white...")
+            display.set_update_mode(EPD_MODE_FULL)
+            display.clear(255)  # White
+            display.update_display()
+            time.sleep(2)
+
+            # Step 6: Set white as base map
+            step += 1
+            print(f"[{step}/{total_steps}] Setting white screen as base map...")
+            display.set_update_mode(EPD_MODE_BASE_MAP)
+            display.update_display()
+            time.sleep(2)
+
+            # Step N-3: Final white clear
+            step += 1
+            print(f"[{step}/{total_steps}] Final clear to white...")
+            display.set_update_mode(EPD_MODE_FULL)
+            display.clear(255)
+            display.update_display()
+            time.sleep(2)
+
+            # Step N-2: Set clean white as base map
+            step += 1
+            print(f"[{step}/{total_steps}] Setting clean base map...")
+            display.set_update_mode(EPD_MODE_BASE_MAP)
+            display.update_display()
+            time.sleep(1)
+
+            # Step N-1: Reset to full mode for normal operation
+            step += 1
+            print(f"[{step}/{total_steps}] Resetting to full update mode...")
+            display.set_update_mode(EPD_MODE_FULL)
+
+            print("\n✓ All RAM buffers cleared successfully!")
+            print("✓ Display recovery complete!")
+
             response = input("\nPut display to deep sleep? (y/N): ").lower()
             if response == "y":
                 print("Entering deep sleep mode...")
-                fcntl.ioctl(fb_file, EPD_IOC_DEEP_SLEEP)
-                print("Display is now in deep sleep mode.")
+                display.deep_sleep()
 
             return True
 
     except FileNotFoundError:
-        print(f"Error: Framebuffer device {fb_device} not found.")
-        print("Make sure the driver is loaded: sudo modprobe pamir-ai-eink")
+        print(f"Framebuffer device {fb_device} not found.")
+        print("Load driver: sudo modprobe pamir-ai-eink")
         return False
 
     except PermissionError:
-        print("Error: Permission denied.")
-        print("Try running with sudo:")
-        print(f"  sudo {sys.argv[0]}")
+        print("Permission denied. Try with sudo.")
         return False
 
     except IOError as e:
-        print(f"Error during reset: {e}")
-        print("\nPossible causes:")
-        print("1. Driver not loaded (check with 'lsmod | grep pamir_ai_eink')")
-        print("2. Display hardware not connected properly")
-        print("3. Old driver version without reset support")
+        print(f"Reset failed: {e}")
         return False
 
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"Error: {e}")
         return False
 
 
 def main():
-    """Main function."""
     print("Pamir AI E-Ink Display Recovery Tool")
     print("=====================================\n")
 
-    # Check command line arguments
     fb_device = "/dev/fb0"
-    if len(sys.argv) > 1:
-        fb_device = sys.argv[1]
+    mode = "standard"
+
+    # Parse arguments
+    args = sys.argv[1:]
+    for arg in args:
+        if arg in ["-h", "--help"]:
+            print("Usage: eink_recovery.py [OPTIONS] [DEVICE]")
+            print("\nOptions:")
+            print("  -h, --help      Show this help message")
+            print("\nDevice:")
+            print("  DEVICE          Framebuffer device (default: /dev/fb0)")
+            print("\nExamples:")
+            print("  eink_recovery.py                    # Standard recovery")
+            sys.exit(0)
+        elif not arg.startswith("--"):
+            fb_device = arg
 
     print("This tool will reset your e-ink display to recover from stuck states.")
-    print(f"Using framebuffer device: {fb_device}\n")
+    print(f"Using framebuffer device: {fb_device}")
+    print(f"Recovery mode: {mode.upper()}")
 
     response = input("Proceed with display reset? (y/N): ").lower()
     if response != "y":
@@ -123,14 +153,7 @@ def main():
         return
 
     print()
-    if reset_display(fb_device):
-        print("\nIf the display is still stuck after reset:")
-        print("1. Check hardware connections (SPI, GPIO pins)")
-        print("2. Power cycle the display")
-        print(
-            "3. Reload the driver: sudo modprobe -r pamir-ai-eink && sudo modprobe pamir-ai-eink"
-        )
-    else:
+    if not reset_display(fb_device):
         sys.exit(1)
 
 
