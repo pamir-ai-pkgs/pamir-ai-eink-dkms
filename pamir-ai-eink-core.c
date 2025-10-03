@@ -5,21 +5,20 @@
  * Copyright (C) 2025 Pamir AI
  */
 
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/spi/spi.h>
- #include <linux/of.h>
- #include <linux/of_gpio.h>
- #include <linux/gpio/consumer.h>
- #include <linux/fb.h>
- #include <linux/vmalloc.h>
- #include <linux/delay.h>
- #include <linux/string.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/spi/spi.h>
+#include <linux/of.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio/consumer.h>
+#include <linux/fb.h>
+#include <linux/vmalloc.h>
+#include <linux/delay.h>
+#include <linux/string.h>
 
- #include "pamir-ai-eink-internal.h"
+#include "pamir-ai-eink-internal.h"
 
-static int
-epd_probe(struct spi_device *spi)
+static int epd_probe(struct spi_device *spi)
 {
 	struct device_node *np = spi->dev.of_node;
 	struct epd_dev *epd;
@@ -53,16 +52,15 @@ epd_probe(struct spi_device *spi)
 	epd->height = height;
 	epd->bytes_per_line = DIV_ROUND_UP(width, 8);
 	epd->screensize = epd->bytes_per_line * epd->height;
+	epd->alloc_size = PAGE_ALIGN(epd->screensize);
 	mutex_init(&epd->lock);
 
-	/* Initialize update mode to full refresh */
 	epd->update_mode = EPD_MODE_FULL;
 	epd->partial_area_set = false;
 	epd->initialized = false;
 
-	/* Get GPIOs */
-	epd->reset_gpio = devm_gpiod_get_optional(&spi->dev, "reset",
-						   GPIOD_OUT_HIGH);
+	epd->reset_gpio =
+		devm_gpiod_get_optional(&spi->dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(epd->reset_gpio))
 		return PTR_ERR(epd->reset_gpio);
 
@@ -74,15 +72,12 @@ epd_probe(struct spi_device *spi)
 	if (IS_ERR(epd->busy_gpio))
 		return PTR_ERR(epd->busy_gpio);
 
-	/* Allocate framebuffer */
 	info = framebuffer_alloc(0, &spi->dev);
 	if (!info)
 		return -ENOMEM;
 
 	info->par = epd;
 	epd->info = info;
-
-	/* Setup framebuffer parameters */
 	strscpy(info->fix.id, "PamirAI", sizeof(info->fix.id));
 	info->fix.type = FB_TYPE_PACKED_PIXELS;
 	info->fix.visual = FB_VISUAL_MONO01;
@@ -100,39 +95,34 @@ epd_probe(struct spi_device *spi)
 
 	info->fbops = &epd_fb_ops;
 
-	/* Allocate screen buffer suitable for userspace mapping */
-	info->screen_base = vmalloc_user(epd->screensize);
+	info->screen_base = vmalloc_user(epd->alloc_size);
 	if (!info->screen_base) {
 		ret = -ENOMEM;
 		goto err_fb_release;
 	}
-	/* Clear the allocated memory */
-	memset(info->screen_base, 0, epd->screensize);
+	memset(info->screen_base, 0, epd->alloc_size);
 
-	/* No physical address for vmalloc'd memory */
 	info->fix.smem_start = 0;
-	info->fix.smem_len = epd->screensize;
-
-	/* Register framebuffer */
+	info->fix.smem_len = epd->alloc_size;
 	ret = register_framebuffer(info);
 	if (ret < 0) {
-		dev_err(&spi->dev, "Failed to register framebuffer: %d\n",
-			ret);
+		dev_err(&spi->dev, "Failed to register framebuffer: %d\n", ret);
 		goto err_free_screen;
 	}
 
 	spi_set_drvdata(spi, epd);
 
-	/* Initialize display hardware */
 	ret = epd_hw_init(epd);
 	if (ret) {
-		dev_err(&spi->dev, "Hardware initialization failed: %d\n",
-			ret);
+		dev_err(&spi->dev, "Hardware initialization failed: %d\n", ret);
 		goto err_unregister_fb;
 	}
 	epd->initialized = true;
 
-	/* Create sysfs attributes */
+	ret = epd_clear_display(epd);
+	if (ret)
+		dev_warn(&spi->dev, "Failed to clear display: %d\n", ret);
+
 	ret = sysfs_create_group(&spi->dev.kobj, &epd_attr_group);
 	if (ret) {
 		dev_err(&spi->dev, "Failed to create sysfs attributes: %d\n",
@@ -154,19 +144,29 @@ err_fb_release:
 	return ret;
 }
 
-static void
-epd_remove(struct spi_device *spi)
+static void epd_remove(struct spi_device *spi)
 {
 	struct epd_dev *epd = spi_get_drvdata(spi);
 	struct fb_info *info = epd->info;
+	int ret;
 
 	sysfs_remove_group(&spi->dev.kobj, &epd_attr_group);
+
+	if (epd->initialized) {
+		ret = epd_clear_display(epd);
+		if (ret)
+			dev_warn(&spi->dev, "Failed to clear display: %d\n",
+				 ret);
+
+		ret = epd_deep_sleep(epd);
+		if (ret)
+			dev_warn(&spi->dev, "Failed to enter deep sleep: %d\n",
+				 ret);
+	}
 
 	if (info) {
 		unregister_framebuffer(info);
 		vfree(info->screen_base);
-		if (epd->base_map_buffer)
-			vfree(epd->base_map_buffer);
 		framebuffer_release(info);
 	}
 }

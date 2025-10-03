@@ -5,64 +5,23 @@
  * Copyright (C) 2025 Pamir AI
  */
 
- #include <linux/kernel.h>
- #include <linux/fb.h>
- #include <linux/delay.h>
- #include <linux/gpio/consumer.h>
+#include <linux/kernel.h>
+#include <linux/fb.h>
+#include <linux/delay.h>
+#include <linux/gpio/consumer.h>
 
- #include "pamir-ai-eink-internal.h"
+#include "pamir-ai-eink-internal.h"
 
-/**
- * epd_full_update - Perform a full screen update
- * @epd: EPD device
- *
- * Performs a complete screen refresh with best image quality.
- * This mode clears ghosting but is slower than partial update.
- *
- * Return: 0 on success, negative error code on failure
- */
-int
-epd_full_update(struct epd_dev *epd)
+static int epd_trigger_update(struct epd_dev *epd, u8 mode)
 {
-	struct fb_info *info = epd->info;
-	u8 *buf = info->screen_base;
-	size_t len = epd->screensize;
 	u8 data;
 	int ret;
 
-	if (!buf)
-		return -ENOMEM;
-
-	/* Set full screen boundaries */
-	ret = epd_set_ram_area(epd, 0, epd->height - 1, epd->width - 1, 0);
-	if (ret)
-		return ret;
-
-	/* Write RAM for black/white */
-	ret = epd_send_cmd(epd, EPD_CMD_WRITE_RAM_BW);
-	if (ret)
-		return ret;
-
-	ret = epd_send_data_buf(epd, buf, len);
-	if (ret)
-		return ret;
-
-	/* Set border waveform for full update */
-	ret = epd_send_cmd(epd, EPD_CMD_BORDER_WAVEFORM);
-	if (ret)
-		return ret;
-
-	data = EPD_BORDER_NORMAL;
-	ret = epd_send_data_buf(epd, &data, 1);
-	if (ret)
-		return ret;
-
-	/* Trigger full display update */
 	ret = epd_send_cmd(epd, EPD_CMD_DISPLAY_UPDATE_CTRL2);
 	if (ret)
 		return ret;
 
-	data = EPD_UPDATE_MODE_FULL;
+	data = mode;
 	ret = epd_send_data_buf(epd, &data, 1);
 	if (ret)
 		return ret;
@@ -73,19 +32,53 @@ epd_full_update(struct epd_dev *epd)
 
 	return epd_wait_busy(epd, EPD_BUSY_TIMEOUT_UPDATE_MS);
 }
-EXPORT_SYMBOL_GPL(epd_full_update);
 
-/**
- * epd_partial_update - Perform a partial screen update
- * @epd: EPD device
- *
- * Performs a fast partial update on the specified region.
- * May cause ghosting but is much faster than full update.
- *
- * Return: 0 on success, negative error code on failure
- */
-int
-epd_partial_update(struct epd_dev *epd)
+int epd_full_update(struct epd_dev *epd)
+{
+	struct fb_info *info = epd->info;
+	u8 *buf = info->screen_base;
+	size_t len = epd->screensize;
+	u8 data;
+	int ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	/* Y-increment mode */
+	ret = epd_set_ram_area(epd, 0, 0, epd->width - 1, epd->height - 1);
+	if (ret)
+		return ret;
+
+	ret = epd_send_cmd(epd, EPD_CMD_WRITE_RAM_BW);
+	if (ret)
+		return ret;
+
+	ret = epd_send_data_buf(epd, buf, len);
+	if (ret)
+		return ret;
+
+	/* Clear residual data in red RAM */
+	ret = epd_send_cmd(epd, EPD_CMD_WRITE_RAM_RED);
+	if (ret)
+		return ret;
+
+	ret = epd_send_data_buf(epd, buf, len);
+	if (ret)
+		return ret;
+
+	ret = epd_send_cmd(epd, EPD_CMD_BORDER_WAVEFORM);
+	if (ret)
+		return ret;
+
+	data = EPD_BORDER_NORMAL;
+	ret = epd_send_data_buf(epd, &data, 1);
+	if (ret)
+		return ret;
+
+	return epd_trigger_update(epd, EPD_UPDATE_MODE_FULL);
+}
+
+int epd_partial_update(struct epd_dev *epd)
 {
 	struct fb_info *info = epd->info;
 	struct epd_update_area *area = &epd->partial_area;
@@ -94,7 +87,6 @@ epd_partial_update(struct epd_dev *epd)
 	u32 x_bytes, y;
 	int ret;
 
-	/* Check if display is initialized */
 	if (!epd->initialized) {
 		dev_err(&epd->spi->dev,
 			"Display not initialized, cannot perform partial update\n");
@@ -102,14 +94,12 @@ epd_partial_update(struct epd_dev *epd)
 	}
 
 	if (!epd->partial_area_set) {
-		/* If no area set, do full screen partial update */
 		area->x = 0;
 		area->y = 0;
 		area->width = epd->width;
 		area->height = epd->height;
 	}
 
-	/* Validate and align coordinates */
 	if (area->x % 8 != 0 || area->width % 8 != 0) {
 		dev_err(&epd->spi->dev,
 			"Partial update X coordinates must be byte-aligned\n");
@@ -123,7 +113,6 @@ epd_partial_update(struct epd_dev *epd)
 		return -EINVAL;
 	}
 
-	/* Lock border to prevent flashing */
 	ret = epd_send_cmd(epd, EPD_CMD_BORDER_WAVEFORM);
 	if (ret)
 		return ret;
@@ -133,22 +122,18 @@ epd_partial_update(struct epd_dev *epd)
 	if (ret)
 		return ret;
 
-	/* Set RAM boundaries for partial area */
-	ret = epd_set_ram_area(epd, area->x, area->y + area->height - 1,
-			       area->x + area->width - 1, area->y);
+	ret = epd_set_ram_area(epd, area->x, area->y, area->x + area->width - 1,
+			       area->y + area->height - 1);
 	if (ret)
 		return ret;
 
-	/* Write partial area data */
 	ret = epd_send_cmd(epd, EPD_CMD_WRITE_RAM_BW);
 	if (ret)
 		return ret;
 
-	/* Calculate buffer location and size */
 	x_bytes = area->width / 8;
 	buf = info->screen_base;
 
-	/* Send only the partial area data */
 	for (y = area->y; y < area->y + area->height; y++) {
 		size_t offset = y * epd->bytes_per_line + (area->x / 8);
 
@@ -157,35 +142,12 @@ epd_partial_update(struct epd_dev *epd)
 			return ret;
 	}
 
-	/* Trigger partial display update */
-	ret = epd_send_cmd(epd, EPD_CMD_DISPLAY_UPDATE_CTRL2);
-	if (ret)
-		return ret;
+	ret = epd_trigger_update(epd, EPD_UPDATE_MODE_PARTIAL);
 
-	data = EPD_UPDATE_MODE_PARTIAL;
-	ret = epd_send_data_buf(epd, &data, 1);
-	if (ret)
-		return ret;
-
-	ret = epd_send_cmd(epd, EPD_CMD_ACTIVATE);
-	if (ret)
-		return ret;
-
-	return epd_wait_busy(epd, EPD_BUSY_TIMEOUT_UPDATE_MS);
+	return ret;
 }
-EXPORT_SYMBOL_GPL(epd_partial_update);
 
-/**
- * epd_base_map_update - Perform base map mode update
- * @epd: EPD device
- *
- * Updates both RAM buffers (0x24 and 0x26) with the same data.
- * Used for setting a base image for subsequent partial updates.
- *
- * Return: 0 on success, negative error code on failure
- */
-int
-epd_base_map_update(struct epd_dev *epd)
+int epd_base_map_update(struct epd_dev *epd)
 {
 	struct fb_info *info = epd->info;
 	u8 *buf = info->screen_base;
@@ -196,7 +158,10 @@ epd_base_map_update(struct epd_dev *epd)
 	if (!buf)
 		return -ENOMEM;
 
-	/* Write to first RAM (0x24) */
+	ret = epd_set_ram_area(epd, 0, 0, epd->width - 1, epd->height - 1);
+	if (ret)
+		return ret;
+
 	ret = epd_send_cmd(epd, EPD_CMD_WRITE_RAM_BW);
 	if (ret)
 		return ret;
@@ -205,16 +170,6 @@ epd_base_map_update(struct epd_dev *epd)
 	if (ret)
 		return ret;
 
-	/* Write to second RAM (0x26) for base map */
-	ret = epd_send_cmd(epd, EPD_CMD_WRITE_RAM_RED);
-	if (ret)
-		return ret;
-
-	ret = epd_send_data_buf(epd, buf, len);
-	if (ret)
-		return ret;
-
-	/* Trigger full display update */
 	ret = epd_send_cmd(epd, EPD_CMD_DISPLAY_UPDATE_CTRL2);
 	if (ret)
 		return ret;
@@ -230,18 +185,8 @@ epd_base_map_update(struct epd_dev *epd)
 
 	return epd_wait_busy(epd, EPD_BUSY_TIMEOUT_UPDATE_MS);
 }
-EXPORT_SYMBOL_GPL(epd_base_map_update);
 
-/**
- * epd_display_flush - Flush framebuffer to display
- * @epd: EPD device
- *
- * Updates the display according to the current update mode.
- *
- * Return: 0 on success, negative error code on failure
- */
-int
-epd_display_flush(struct epd_dev *epd)
+int epd_display_flush(struct epd_dev *epd)
 {
 	int ret;
 
@@ -267,21 +212,86 @@ epd_display_flush(struct epd_dev *epd)
 	mutex_unlock(&epd->lock);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(epd_display_flush);
 
-/**
- * epd_deep_sleep - Put display into deep sleep mode
- * @epd: EPD device
- *
- * Enters deep sleep mode to save power. Display must be
- * re-initialized before next use.
- *
- * Return: 0 on success, negative error code on failure
- */
-int
-epd_deep_sleep(struct epd_dev *epd)
+int epd_clear_display(struct epd_dev *epd)
 {
-	u8 data = 0x01;
+	size_t len = epd->screensize;
+	u8 *clear_buf;
+	u8 data;
+	int ret;
+
+	// ret = epd_hw_init(epd);
+	// if (ret) {
+	//	dev_warn(&epd->spi->dev, "Failed to reinit hardware: %d\n", ret);
+	// }
+
+	/* Y-decrement mode needed for proper clear */
+	data = 0x01; /* X-increment, Y-decrement - matches height-1 to 0 coords */
+	ret = epd_send_cmd(epd, EPD_CMD_DATA_ENTRY_MODE);
+	if (ret)
+		return ret;
+	ret = epd_send_data_buf(epd, &data, 1);
+	if (ret)
+		return ret;
+
+	clear_buf = kmalloc(len, GFP_KERNEL);
+	if (!clear_buf)
+		return -ENOMEM;
+	memset(clear_buf, 0xFF, len);
+
+	/* Y-increment mode */
+	ret = epd_set_ram_area(epd, 0, 0, epd->width - 1, epd->height - 1);
+	if (ret)
+		goto out_free;
+
+	ret = epd_send_cmd(epd, EPD_CMD_WRITE_RAM_BW);
+	if (ret)
+		goto out_free;
+
+	ret = epd_send_data_buf(epd, clear_buf, len);
+	if (ret)
+		goto out_free;
+
+	/* Prevent ghosting */
+	ret = epd_send_cmd(epd, EPD_CMD_WRITE_RAM_RED);
+	if (ret)
+		goto out_free;
+
+	ret = epd_send_data_buf(epd, clear_buf, len);
+	if (ret)
+		goto out_free;
+
+	ret = epd_send_cmd(epd, EPD_CMD_DISPLAY_UPDATE_CTRL2);
+	if (ret)
+		goto out_free;
+
+	data = EPD_UPDATE_MODE_FULL;
+	ret = epd_send_data_buf(epd, &data, 1);
+	if (ret)
+		goto out_free;
+
+	ret = epd_send_cmd(epd, EPD_CMD_ACTIVATE);
+	if (ret)
+		goto out_free;
+
+	ret = epd_wait_busy(epd, EPD_BUSY_TIMEOUT_UPDATE_MS);
+	if (ret)
+		goto out_free;
+
+	data = 0x03; /* X-increment, Y-increment for text display */
+	ret = epd_send_cmd(epd, EPD_CMD_DATA_ENTRY_MODE);
+	if (ret)
+		goto out_free;
+	ret = epd_send_data_buf(epd, &data, 1);
+
+out_free:
+	kfree(clear_buf);
+	return ret;
+}
+
+int epd_deep_sleep(struct epd_dev *epd)
+{
+	u8 data = 0x11; /* Mode 2: Deep Sleep without RAM retention */
 	int ret;
 
 	mutex_lock(&epd->lock);
@@ -290,7 +300,6 @@ epd_deep_sleep(struct epd_dev *epd)
 	if (!ret)
 		ret = epd_send_data_buf(epd, &data, 1);
 
-	/* Display is no longer initialized after deep sleep */
 	if (!ret)
 		epd->initialized = false;
 
@@ -301,4 +310,3 @@ epd_deep_sleep(struct epd_dev *epd)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(epd_deep_sleep);
