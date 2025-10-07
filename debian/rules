@@ -7,6 +7,12 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 %:
 	dh $@
 
+override_dh_auto_build:
+	@echo "DKMS package - skipping kernel module build (will build on target system)"
+
+override_dh_auto_test:
+	@echo "DKMS package - skipping tests"
+
 override_dh_auto_install:
 	# Install DKMS source files
 	install -d debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0
