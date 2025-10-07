@@ -11,6 +11,13 @@ dist/
 *.tar.*
 *.upload
 **/__pycache__
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/pamir-ai-eink-dkms.*
+debian/pamir-ai-eink-dkms/
+debian/pamir-ai-eink-tests.*
+debian/pamir-ai-eink-tests/
 
 # DKMS build artifacts
 *.o
