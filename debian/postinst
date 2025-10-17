@@ -2,93 +2,92 @@
 
 set -e
 
-PACKAGE_NAME="pamir-ai-eink"
-PACKAGE_VERSION="1.0.0"
-DKMS_SOURCE_DIR="/usr/src/${PACKAGE_NAME}-${PACKAGE_VERSION}"
-OVERLAY_SOURCE="${DKMS_SOURCE_DIR}/pamir-ai-eink-overlay.dts"
-OVERLAY_DEST="/boot/firmware/overlays/pamir-ai-eink.dtbo"
+#DEBHELPER#
+
+# DKMS variables
+DKMS_NAME="pamir-ai-eink"
+DKMS_VERSION="1.0.0"
+DKMS_SOURCE_DIR="/usr/src/${DKMS_NAME}-${DKMS_VERSION}"
+source "${DKMS_SOURCE_DIR}/platform-detect.sh"
 
 case "$1" in
 configure)
-	echo "Configuring pamir-ai-eink-dkms..."
+	# Detect platform
+	PLATFORM=$(detect_platform)
+	if [ "$PLATFORM" = "unknown" ]; then
+		echo "Warning: Unknown platform detected, skipping overlay installation" >&2
+		exit 0
+	fi
+	echo "Detected platform: $PLATFORM"
 
-	if [ ! -f "${DKMS_SOURCE_DIR}/dkms.conf" ]; then
-		echo "Error: DKMS configuration file not found at ${DKMS_SOURCE_DIR}/dkms.conf"
-		exit 1
+	# Get platform-specific paths and names
+	OVERLAY_DIR=$(get_overlay_dir "$PLATFORM")
+	CONFIG_FILE=$(get_config_file "$PLATFORM")
+	OVERLAY_NAME=$(get_overlay_name "$PLATFORM")
+	DTS_FILE=$(get_dts_file "$PLATFORM")
+	OVERLAY_SOURCE="${DKMS_SOURCE_DIR}/${DTS_FILE}"
+	OVERLAY_DEST="${OVERLAY_DIR}${OVERLAY_NAME}.dtbo"
+
+	# Create overlay directory if it doesn't exist
+	if [ ! -d "$OVERLAY_DIR" ]; then
+		echo "Creating overlay directory: $OVERLAY_DIR"
+		mkdir -p "$OVERLAY_DIR"
 	fi
 
-	dkms add -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}" || true
+	# Compile and install device tree overlay if source exists
+	if [ -f "$OVERLAY_SOURCE" ] && [ -d "$OVERLAY_DIR" ]; then
+		echo "Compiling device tree overlay from $OVERLAY_SOURCE..."
+		if dtc -@ -I dts -O dtb -o "$OVERLAY_DEST" "$OVERLAY_SOURCE" 2>/dev/null; then
+			echo "Device tree overlay successfully installed at $OVERLAY_DEST"
 
-	if dkms build -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}"; then
-		# Install the module
-		if ! dkms install -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}"; then
-			echo "Warning: Failed to install ${PACKAGE_NAME} modules"
-		fi
-	else
-		echo "Warning: Failed to build ${PACKAGE_NAME} modules"
-	fi
-
-	# Compile and install device tree overlay
-	if [ -f "${OVERLAY_SOURCE}" ]; then
-		echo "Compiling device tree overlay..."
-
-		# Check if device-tree-compiler is available
-		if command -v dtc &>/dev/null &&
-			[ -d "/boot/firmware" ] &&
-			mkdir -p "$(dirname "${OVERLAY_DEST}")"; then
-			if ! dtc -@ -I dts -O dtb -o "${OVERLAY_DEST}" "${OVERLAY_SOURCE}"; then
-				echo "Warning: Failed to compile device tree overlay"
+			if [ -f "$CONFIG_FILE" ]; then
+				# Handle platform-specific overlay configuration syntax
+				if [ "$PLATFORM" = "armbian" ] || [ "$PLATFORM" = "rockchip" ] || [ "$PLATFORM" = "armsom-rk3576" ]; then
+					# Armbian/Rockchip: overlays= space-separated syntax
+					if grep -q "^overlays=" "$CONFIG_FILE"; then
+						# Check if overlay already exists in the list
+						if ! grep "^overlays=" "$CONFIG_FILE" | grep -qE "(^overlays=|[[:space:]])${OVERLAY_NAME}([[:space:]]|$)"; then
+							echo "Adding $OVERLAY_NAME to overlays list in $CONFIG_FILE"
+							# Append to existing overlays= line
+							sed -i "s/^overlays=\(.*\)/overlays=\1 $OVERLAY_NAME/" "$CONFIG_FILE"
+							echo "Please reboot for the overlay to take effect"
+						else
+							echo "Overlay $OVERLAY_NAME already configured in $CONFIG_FILE"
+						fi
+					else
+						# No overlays= line exists, create one
+						echo "Creating overlays list with $OVERLAY_NAME in $CONFIG_FILE"
+						echo "overlays=$OVERLAY_NAME" >>"$CONFIG_FILE"
+						echo "Please reboot for the overlay to take effect"
+					fi
+				else
+					# Raspberry Pi uses "dtoverlay=" with separate lines
+					if ! grep -q "^dtoverlay=${OVERLAY_NAME}" "$CONFIG_FILE"; then
+						echo "Adding overlay to $CONFIG_FILE"
+						# Add comment before overlay
+						if ! grep -q "# Pamir AI E-Ink FB - Added by pamir-ai-eink-dkms package" "$CONFIG_FILE"; then
+							echo "" >>"$CONFIG_FILE"
+							echo "# Pamir AI E-Ink FB - Added by pamir-ai-eink-dkms package" >>"$CONFIG_FILE"
+						fi
+						echo "dtoverlay=${OVERLAY_NAME}" >>"$CONFIG_FILE"
+						echo "Please reboot for the overlay to take effect"
+					else
+						echo "Overlay already configured in $CONFIG_FILE"
+					fi
+				fi
 			fi
 		else
-			echo "Warning: Failed to install device tree overlay"
+			echo "Warning: Failed to compile device tree overlay (this is normal if not on target hardware)"
 		fi
 	fi
-
-	# Update module dependencies
-	if [ -d "/lib/modules/$(uname -r)" ]; then
-		depmod -a || true
-	fi
-
-	# Auto-configure device tree overlay in config.txt
-	CONFIG_FILE="/boot/firmware/config.txt"
-	OVERLAY_LINE="dtoverlay=pamir-ai-eink"
-
-	if [ -f "${CONFIG_FILE}" ]; then
-		echo "Configuring device tree overlay in ${CONFIG_FILE}..."
-
-		# Check if overlay is already configured
-		if ! grep -q "^${OVERLAY_LINE}" "${CONFIG_FILE}"; then
-			# Check if file doesn't end with newline, add one if needed
-			if [ -s "${CONFIG_FILE}" ] && [ "$(tail -c1 "${CONFIG_FILE}" | wc -l)" -eq 0 ]; then
-				echo "" >>"${CONFIG_FILE}"
-			fi
-			# Add a comment and the overlay line
-			echo "# Pamir AI E-Ink FB - Added by pamir-ai-eink-dkms package" >>"${CONFIG_FILE}"
-			echo "${OVERLAY_LINE}" >>"${CONFIG_FILE}"
-			echo "Device tree overlay configured in ${CONFIG_FILE}"
-		else
-			echo "Device tree overlay already configured in ${CONFIG_FILE}"
-		fi
-	else
-		echo "Warning: ${CONFIG_FILE} not found, overlay not auto-configured"
-	fi
-
-	echo ""
-	echo "Pamir AI E-Ink FB DKMS installation completed!"
-	echo ""
-	echo "The eink fb has been automatically configured in ${CONFIG_FILE}"
-	echo "Please reboot your system to activate the eink fb driver."
-	echo ""
 	;;
 
 abort-upgrade | abort-remove | abort-deconfigure) ;;
 
 *)
-	echo "postinst called with unknown argument \`$1'" >&2
+	echo "postinst called with unknown argument '$1'" >&2
 	exit 1
 	;;
 esac
-
-#DEBHELPER#
 
 exit 0

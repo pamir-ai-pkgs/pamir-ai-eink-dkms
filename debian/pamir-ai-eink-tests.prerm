@@ -2,31 +2,24 @@
 set -e
 
 case "$1" in
-    remove|upgrade|deconfigure)
-        # Remove symlinks from /usr/local/bin
-        for prog in /opt/distiller-eink-tests/bin/*; do
-            if [ -f "$prog" ]; then
-                basename=$(basename "$prog")
-                rm -f "/usr/local/bin/eink-$basename" 2>/dev/null || true
-            fi
-        done
+remove | upgrade | deconfigure)
+	# Remove symlinks from /usr/bin
+	if [ -d /usr/lib/pamir-ai-eink-tests/bin ]; then
+		for prog in /usr/lib/pamir-ai-eink-tests/bin/*; do
+			if [ -f "$prog" ]; then
+				basename=$(basename "$prog")
+				rm -f "/usr/bin/pamir-eink-$basename" 2>/dev/null || true
+			fi
+		done
+	fi
+	;;
 
-        # Clean up compiled binaries (keep source files)
-        # This ensures a clean state for upgrades
-        if [ -d /opt/distiller-eink-tests/bin ]; then
-            for prog in eink_demo eink_clock eink_monitor; do
-                rm -f "/opt/distiller-eink-tests/bin/$prog" 2>/dev/null || true
-            done
-        fi
-        ;;
+failed-upgrade) ;;
 
-    failed-upgrade)
-        ;;
-
-    *)
-        echo "prerm called with unknown argument \`$1'" >&2
-        exit 1
-        ;;
+*)
+	echo "prerm called with unknown argument \`$1'" >&2
+	exit 1
+	;;
 esac
 
 #DEBHELPER#

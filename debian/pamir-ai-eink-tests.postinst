@@ -2,141 +2,57 @@
 set -e
 
 case "$1" in
-    configure)
-        # Compile C test programs on the target device
-        if [ -d /opt/distiller-eink-tests/src ]; then
-            echo "Compiling e-ink test programs..."
+configure)
+	# Create symlinks in /usr/bin for easy access
+	if [ -d /usr/lib/pamir-ai-eink-tests/bin ]; then
+		for prog in /usr/lib/pamir-ai-eink-tests/bin/*; do
+			if [ -f "$prog" ] && [ -x "$prog" ]; then
+				basename=$(basename "$prog")
+				ln -sf "$prog" "/usr/bin/pamir-eink-$basename" 2>/dev/null || true
+			fi
+		done
+	fi
 
-            # Check if gcc is available
-            if ! command -v gcc >/dev/null 2>&1; then
-                echo "Warning: gcc not found. Install build-essential to compile test programs."
-                echo "  sudo apt-get install build-essential"
-            else
-                cd /opt/distiller-eink-tests/src
+	echo ""
+	echo "E-Ink test programs installed to /usr/lib/pamir-ai-eink-tests/"
+	echo ""
+	echo "Available commands (installed to /usr/bin):"
 
-                # Compile each C program
-                for src in eink_demo.c eink_clock.c eink_monitor.c; do
-                    if [ -f "$src" ]; then
-                        prog="${src%.c}"
-                        echo "  Compiling $prog..."
+	# List Python programs
+	for prog in demo weather reader recovery image gif; do
+		cmd="pamir-eink-eink_$prog"
+		[ "$prog" = "gif" ] && cmd="pamir-eink-gif"
+		if [ -x "/usr/bin/$cmd" ]; then
+			case $prog in
+			demo) echo "  $cmd        - Basic demonstration" ;;
+			weather) echo "  $cmd     - Weather dashboard (requires API key)" ;;
+			reader) echo "  $cmd      - E-book reader" ;;
+			recovery) echo "  $cmd    - Display recovery tool" ;;
+			image) echo "  $cmd       - Display any image format (PNG, JPEG, BMP, etc.)" ;;
+			gif) echo "  $cmd            - GIF animation player" ;;
+			esac
+		fi
+	done
 
-                        # Try to compile using Makefile first, then fallback to direct compilation
-                        if [ -f Makefile ]; then
-                            if ! make STANDALONE=1 "$prog" 2>&1; then
-                                echo "    Warning: Makefile compilation failed, trying direct compilation"
-                                if ! gcc -Wall -O2 -o "$prog" "$src" -lm; then
-                                    echo "    Error: Failed to compile $prog"
-                                    continue
-                                fi
-                            fi
-                        else
-                            # Direct compilation
-                            if ! gcc -Wall -O2 -o "$prog" "$src" -lm; then
-                                echo "    Error: Failed to compile $prog"
-                                continue
-                            fi
-                        fi
+	echo ""
+	echo "C source code examples available at:"
+	echo "  /usr/lib/pamir-ai-eink-tests/examples/"
+	echo ""
+	echo "To compile C examples manually:"
+	echo "  cd /usr/lib/pamir-ai-eink-tests/examples"
+	echo "  make"
+	echo ""
+	echo "To use the test programs, ensure your user is in the video group:"
+	echo "  sudo usermod -a -G video \$USER"
+	echo ""
+	;;
 
-                        # Move compiled binary to bin directory
-                        if [ -f "$prog" ]; then
-                            mv "$prog" /opt/distiller-eink-tests/bin/
-                            chmod 755 "/opt/distiller-eink-tests/bin/$prog"
-                            echo "    Success: $prog compiled and installed"
-                        fi
-                    fi
-                done
+abort-upgrade | abort-remove | abort-deconfigure) ;;
 
-                cd - >/dev/null
-            fi
-        fi
-
-        # Set proper permissions for all programs
-        if [ -d /opt/distiller-eink-tests ]; then
-            # Make all binaries executable
-            find /opt/distiller-eink-tests/bin -type f -exec chmod 755 {} \;
-
-            # Make Python scripts executable
-            find /opt/distiller-eink-tests/python -name "*.py" -exec chmod 755 {} \;
-
-            # Set ownership to root but allow video group access
-            chown -R root:video /opt/distiller-eink-tests
-
-            # Allow video group to access framebuffer
-            chmod 750 /opt/distiller-eink-tests/bin/* 2>/dev/null || true
-
-            # Create symlinks in /usr/local/bin for easy access
-            for prog in /opt/distiller-eink-tests/bin/*; do
-                if [ -f "$prog" ] && [ -x "$prog" ]; then
-                    basename=$(basename "$prog")
-                    ln -sf "$prog" "/usr/local/bin/eink-$basename" 2>/dev/null || true
-                fi
-            done
-
-            # Add PATH suggestion
-            echo ""
-            echo "E-Ink test programs installed to /opt/distiller-eink-tests/"
-            echo "Programs are also available as eink-* commands in /usr/local/bin"
-            echo ""
-            echo "To use the test programs, ensure your user is in the video group:"
-            echo "  sudo usermod -a -G video \$USER"
-            echo ""
-            echo "Available test programs:"
-
-            # List compiled C programs
-            for prog in demo clock monitor; do
-                if [ -x "/opt/distiller-eink-tests/bin/eink_$prog" ]; then
-                    case $prog in
-                        demo) echo "  eink-eink_demo    - Basic demonstration" ;;
-                        clock) echo "  eink-eink_clock   - Real-time clock display" ;;
-                        monitor) echo "  eink-eink_monitor - System resource monitor" ;;
-                    esac
-                fi
-            done
-
-            # List Python programs
-            if [ -x "/opt/distiller-eink-tests/bin/eink_weather" ]; then
-                echo "  eink-eink_weather - Weather dashboard (requires API key)"
-            fi
-            if [ -x "/opt/distiller-eink-tests/bin/eink_reader" ]; then
-                echo "  eink-eink_reader  - E-book reader"
-            fi
-            if [ -x "/opt/distiller-eink-tests/bin/eink_image" ]; then
-                echo "  eink-eink_image   - Display any image format (PNG, JPEG, BMP, etc.)"
-            fi
-            if [ -x "/opt/distiller-eink-tests/bin/eink_recovery" ]; then
-                echo "  eink-eink_recovery - Display recovery tool"
-            fi
-            if [ -x "/opt/distiller-eink-tests/bin/gif" ]; then
-                echo "  eink-gif         - GIF animation player"
-            fi
-            echo ""
-
-            # Check if any C programs failed to compile
-            failed=0
-            for src in eink_demo.c eink_clock.c eink_monitor.c; do
-                prog="${src%.c}"
-                if [ -f "/opt/distiller-eink-tests/src/$src" ] && [ ! -x "/opt/distiller-eink-tests/bin/$prog" ]; then
-                    failed=1
-                fi
-            done
-
-            if [ $failed -eq 1 ]; then
-                echo "Note: Some C programs failed to compile."
-                echo "Ensure build-essential is installed:"
-                echo "  sudo apt-get install build-essential"
-                echo "Then manually compile in /opt/distiller-eink-tests/src/"
-                echo ""
-            fi
-        fi
-        ;;
-
-    abort-upgrade|abort-remove|abort-deconfigure)
-        ;;
-
-    *)
-        echo "postinst called with unknown argument \`$1'" >&2
-        exit 1
-        ;;
+*)
+	echo "postinst called with unknown argument \`$1'" >&2
+	exit 1
+	;;
 esac
 
 #DEBHELPER#

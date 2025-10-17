@@ -4,8 +4,10 @@ Priority: optional
 Maintainer: PamirAI Incorporated <founders@pamir.ai>
 Standards-Version: 4.7.0
 Build-Depends: debhelper-compat (= 13),
-               dkms,
-               device-tree-compiler
+               dh-exec,
+               dh-sequence-dkms,
+               device-tree-compiler,
+               lintian
 Homepage: https://github.com/pamir-ai-pkgs/pamir-ai-eink-dkms
 Vcs-Git: https://github.com/pamir-ai-pkgs/pamir-ai-eink-dkms.git
 Vcs-Browser: https://github.com/pamir-ai-pkgs/pamir-ai-eink-dkms
@@ -13,13 +15,18 @@ Vcs-Browser: https://github.com/pamir-ai-pkgs/pamir-ai-eink-dkms
 Package: pamir-ai-eink-dkms
 Architecture: all
 Depends: ${misc:Depends},
-         dkms,
-         device-tree-compiler,
-         linux-headers-rpi-2712
-Recommends: pamir-ai-eink-tests
+         device-tree-compiler
+Recommends: pamir-ai-eink-tests,
+            linux-headers-vendor-rk35xx | linux-headers-current-rk35xx | linux-headers-edge-rk35xx | raspberrypi-kernel-headers
 Description: Pamir AI E-Ink Display Driver (DKMS)
  This package provides a DKMS (Dynamic Kernel Module Support) driver
  for Pamir AI E-Ink displays using the SSD1680 controller.
+ .
+ Supported platforms:
+  - Raspberry Pi CM5 (BCM2712)
+  - Rockchip RK3566 (Radxa Zero 3/3W)
+  - Rockchip RK3576 (ArmSom CM5 IO)
+ .
 
 Package: pamir-ai-eink-tests
 Architecture: all

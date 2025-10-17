@@ -1,60 +1,68 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
-PACKAGE_NAME="pamir-ai-eink"
-PACKAGE_VERSION="1.0.0"
+# DKMS variables
+DKMS_NAME="pamir-ai-eink"
+DKMS_VERSION="1.0.0"
+DKMS_SOURCE_DIR="/usr/src/${DKMS_NAME}-${DKMS_VERSION}"
+source "${DKMS_SOURCE_DIR}/platform-detect.sh"
 
 case "$1" in
 remove | upgrade | deconfigure)
-	echo "Removing pamir-ai-eink-dkms..."
-
-	# Unload modules if they are loaded
-	echo "Unloading kernel module..."
-	if lsmod | grep -q "^pamir-ai-eink"; then
-		echo "Unloading pamir-ai-eink..."
-		rmmod "pamir-ai-eink" || echo "Warning: Failed to unload pamir-ai-eink"
+	# Remove DKMS module
+	echo "Removing ${DKMS_NAME} ${DKMS_VERSION} from DKMS..."
+	if [ "$(dkms status -m ${DKMS_NAME} -v ${DKMS_VERSION})" ]; then
+		dkms remove -m ${DKMS_NAME} -v ${DKMS_VERSION} --all
 	fi
 
-	# Remove device tree overlay configuration from config.txt
-	CONFIG_FILE="/boot/firmware/config.txt"
-	OVERLAY_LINE="dtoverlay=pamir-ai-eink"
-	COMMENT_LINE="# Pamir AI E-Ink FB - Added by pamir-ai-eink-dkms package"
+	# Detect platform
+	PLATFORM=$(detect_platform)
+	if [ "$PLATFORM" = "unknown" ]; then
+		echo "Warning: Unknown platform, skipping config cleanup" >&2
+		exit 0
+	fi
 
-	if [ -f "${CONFIG_FILE}" ]; then
-		echo "Removing device tree overlay configuration from ${CONFIG_FILE}..."
+	# Get platform-specific paths and names
+	OVERLAY_DIR=$(get_overlay_dir "$PLATFORM")
+	CONFIG_FILE=$(get_config_file "$PLATFORM")
+	OVERLAY_NAME=$(get_overlay_name "$PLATFORM")
+	OVERLAY_DEST="${OVERLAY_DIR}${OVERLAY_NAME}.dtbo"
 
-		# Create backup with proper error handling
-		if ! cp -a "${CONFIG_FILE}" "${CONFIG_FILE}.backup"; then
-			echo "Error: Failed to create backup of ${CONFIG_FILE}" >&2
-			exit 1
-		fi
+	# Remove device tree overlay
+	[ -f "$OVERLAY_DEST" ] && rm -f "$OVERLAY_DEST"
 
-		# Remove overlay configuration using sed with atomic operation
-		if sed -i "/^${OVERLAY_LINE}/d; /^${COMMENT_LINE}/d" "${CONFIG_FILE}"; then
-			rm -f "${CONFIG_FILE}.backup"
-			echo "Device tree overlay configuration removed from ${CONFIG_FILE}"
+	# Remove from config file
+	if [ -f "$CONFIG_FILE" ]; then
+		if [ "$PLATFORM" = "armbian" ] || [ "$PLATFORM" = "rockchip" ] || [ "$PLATFORM" = "armsom-rk3576" ]; then
+			# Armbian/Rockchip: overlays= space-separated syntax
+			if grep -q "^overlays=.*${OVERLAY_NAME}" "$CONFIG_FILE"; then
+				echo "Removing overlay from $CONFIG_FILE"
+				# Handle overlay at any position in space-separated list
+				sed -i "s/\(^overlays=.*\) ${OVERLAY_NAME} /\1 /" "$CONFIG_FILE"
+				sed -i "s/ ${OVERLAY_NAME}$//" "$CONFIG_FILE"
+				sed -i "s/^overlays=${OVERLAY_NAME} /overlays=/" "$CONFIG_FILE"
+				sed -i "s/^overlays=${OVERLAY_NAME}$/overlays=/" "$CONFIG_FILE"
+				sed -i "/^overlays=$/d" "$CONFIG_FILE"
+				echo "Please reboot for changes to take effect"
+			fi
 		else
-			# Restore from backup on failure
-			mv "${CONFIG_FILE}.backup" "${CONFIG_FILE}"
-			echo "Error: Failed to modify ${CONFIG_FILE}, restored from backup" >&2
-			exit 1
+			# Raspberry Pi: dtoverlay= line-based syntax
+			if grep -q "^dtoverlay=${OVERLAY_NAME}" "$CONFIG_FILE"; then
+				echo "Removing overlay from $CONFIG_FILE"
+				sed -i "/^dtoverlay=${OVERLAY_NAME}/d" "$CONFIG_FILE"
+				# Remove comment if it exists
+				sed -i "/^# Pamir AI E-Ink FB - Added by pamir-ai-eink-dkms package/d" "$CONFIG_FILE"
+				echo "Please reboot for changes to take effect"
+			fi
 		fi
-	else
-		echo "Warning: ${CONFIG_FILE} not found, skipping config removal"
-	fi
-
-	# Remove from DKMS
-	if dkms status -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}" | grep -q "${PACKAGE_NAME}"; then
-		echo "Removing ${PACKAGE_NAME} from DKMS..."
-		dkms remove -m "${PACKAGE_NAME}" -v "${PACKAGE_VERSION}" --all || true
 	fi
 	;;
 
 failed-upgrade) ;;
 
 *)
-	echo "prerm called with unknown argument \`$1'" >&2
+	echo "prerm called with unknown argument '$1'" >&2
 	exit 1
 	;;
 esac

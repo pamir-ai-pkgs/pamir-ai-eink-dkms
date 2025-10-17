@@ -1,5 +1,8 @@
 #!/usr/bin/make -f
 
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
 # Export DEB_BUILD_OPTIONS for cross-compilation
 export DEB_BUILD_OPTIONS = nocheck
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
@@ -14,67 +17,49 @@ override_dh_auto_test:
 	@echo "DKMS package - skipping tests"
 
 override_dh_auto_install:
-	# Install DKMS source files
-	install -d debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0
-	install -m 644 pamir-ai-eink-core.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	install -m 644 pamir-ai-eink-hw.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	install -m 644 pamir-ai-eink-display.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	install -m 644 pamir-ai-eink-fb.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	install -m 644 pamir-ai-eink-sysfs.c debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	install -m 644 pamir-ai-eink-internal.h debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	install -m 644 pamir-ai-eink.h debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	install -m 644 Makefile debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	install -m 644 dkms.conf debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/
-	install -m 644 *.dts debian/pamir-ai-eink-dkms/usr/src/pamir-ai-eink-1.0.0/ || true
+	@echo "DKMS package - using dh-exec and dh_dkms for installation"
 
-	# Install test programs to /opt/distiller-eink-tests
+	# Install test programs to /usr/lib/pamir-ai-eink-tests
 	if [ -d examples ]; then \
-		install -d debian/pamir-ai-eink-tests/opt/distiller-eink-tests/bin && \
-		install -d debian/pamir-ai-eink-tests/opt/distiller-eink-tests/src && \
-		install -d debian/pamir-ai-eink-tests/opt/distiller-eink-tests/python && \
-		install -d debian/pamir-ai-eink-tests/opt/distiller-eink-tests/doc && \
-		for prog in eink_demo.c eink_clock.c eink_monitor.c; do \
-			if [ -f examples/$$prog ]; then \
-				echo "Installing $$prog source..."; \
-				install -m 644 examples/$$prog debian/pamir-ai-eink-tests/opt/distiller-eink-tests/src/; \
+		install -d debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/bin && \
+		install -d debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/python && \
+		install -d debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/examples && \
+		install -d debian/pamir-ai-eink-tests/usr/share/doc/pamir-ai-eink-tests && \
+		\
+		for src in eink_demo.c eink_clock.c eink_monitor.c; do \
+			if [ -f examples/$$src ]; then \
+				install -m 644 examples/$$src debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/examples/; \
 			fi; \
 		done && \
 		if [ -f examples/Makefile ]; then \
-			install -m 644 examples/Makefile debian/pamir-ai-eink-tests/opt/distiller-eink-tests/src/; \
+			install -m 644 examples/Makefile debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/examples/; \
 		fi && \
+		if [ -f pamir-ai-eink.h ]; then \
+			install -m 644 pamir-ai-eink.h debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/examples/; \
+		fi && \
+		\
 		for script in eink_demo.py eink_weather.py eink_reader.py eink_recovery.py eink_image.py gif.py eink_common.py; do \
 			if [ -f examples/$$script ]; then \
-				install -m 755 examples/$$script debian/pamir-ai-eink-tests/opt/distiller-eink-tests/python/; \
+				install -m 755 examples/$$script debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/python/; \
 			fi; \
 		done && \
 		if [ -f examples/requirements.txt ]; then \
-			install -m 644 examples/requirements.txt debian/pamir-ai-eink-tests/opt/distiller-eink-tests/python/; \
+			install -m 644 examples/requirements.txt debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/python/; \
 		fi && \
 		if [ -f examples/README.md ]; then \
-			install -m 644 examples/README.md debian/pamir-ai-eink-tests/opt/distiller-eink-tests/doc/; \
-		fi && \
-		if [ -f pamir-ai-eink.h ]; then \
-			install -m 644 pamir-ai-eink.h debian/pamir-ai-eink-tests/opt/distiller-eink-tests/src/; \
+			install -m 644 examples/README.md debian/pamir-ai-eink-tests/usr/share/doc/pamir-ai-eink-tests/; \
 		fi; \
 	fi
 
-	# Create wrapper scripts for Python programs with proper shebang
+	# Create wrapper scripts for Python programs
 	for script in eink_demo.py eink_weather.py eink_reader.py eink_recovery.py eink_image.py gif.py; do \
 		if [ -f examples/$$script ]; then \
-			echo "#!/bin/sh" > debian/pamir-ai-eink-tests/opt/distiller-eink-tests/bin/$${script%.py} && \
-			echo "exec python3 /opt/distiller-eink-tests/python/$$script \"\$$@\"" >> debian/pamir-ai-eink-tests/opt/distiller-eink-tests/bin/$${script%.py} && \
-			chmod 755 debian/pamir-ai-eink-tests/opt/distiller-eink-tests/bin/$${script%.py}; \
+			prog=$${script%.py}; \
+			echo "#!/bin/sh" > debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/bin/$$prog && \
+			echo "exec python3 /usr/lib/pamir-ai-eink-tests/python/$$script \"\$$@\"" >> debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/bin/$$prog && \
+			chmod 755 debian/pamir-ai-eink-tests/usr/lib/pamir-ai-eink-tests/bin/$$prog; \
 		fi; \
 	done
-
-override_dh_installdeb:
-	dh_installdeb
-
-override_dh_gencontrol:
-	dh_gencontrol
-
-override_dh_builddeb:
-	dh_builddeb
 
 clean:
 	dh_clean
