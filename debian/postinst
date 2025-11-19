@@ -6,8 +6,12 @@ set -e
 
 # DKMS variables
 DKMS_NAME="pamir-ai-eink"
-DKMS_VERSION="1.0.0"
+DKMS_VERSION=$(dpkg-parsechangelog -l/usr/share/doc/pamir-ai-eink-dkms/changelog.Debian.gz -SVersion | sed 's/-[^-]*$//')
 DKMS_SOURCE_DIR="/usr/src/${DKMS_NAME}-${DKMS_VERSION}"
+[ -z "${DKMS_SOURCE_DIR}" ] && {
+	echo "ERROR: DKMS source directory not found" >&2
+	exit 1
+}
 source "${DKMS_SOURCE_DIR}/platform-detect.sh"
 
 case "$1" in
@@ -57,6 +61,10 @@ configure)
 					else
 						# No overlays= line exists, create one
 						echo "Creating overlays list with $OVERLAY_NAME in $CONFIG_FILE"
+						# Check if file doesn't end with newline, add one if needed
+						if [ -s "${CONFIG_FILE}" ] && [ "$(tail -c1 "${CONFIG_FILE}" | wc -l)" -eq 0 ]; then
+							echo "" >>"$CONFIG_FILE"
+						fi
 						echo "overlays=$OVERLAY_NAME" >>"$CONFIG_FILE"
 						echo "Please reboot for the overlay to take effect"
 					fi
@@ -64,10 +72,9 @@ configure)
 					# Raspberry Pi uses "dtoverlay=" with separate lines
 					if ! grep -q "^dtoverlay=${OVERLAY_NAME}" "$CONFIG_FILE"; then
 						echo "Adding overlay to $CONFIG_FILE"
-						# Add comment before overlay
-						if ! grep -q "# Pamir AI E-Ink FB - Added by pamir-ai-eink-dkms package" "$CONFIG_FILE"; then
+						# Check if file doesn't end with newline, add one if needed
+						if [ -s "${CONFIG_FILE}" ] && [ "$(tail -c1 "${CONFIG_FILE}" | wc -l)" -eq 0 ]; then
 							echo "" >>"$CONFIG_FILE"
-							echo "# Pamir AI E-Ink FB - Added by pamir-ai-eink-dkms package" >>"$CONFIG_FILE"
 						fi
 						echo "dtoverlay=${OVERLAY_NAME}" >>"$CONFIG_FILE"
 						echo "Please reboot for the overlay to take effect"

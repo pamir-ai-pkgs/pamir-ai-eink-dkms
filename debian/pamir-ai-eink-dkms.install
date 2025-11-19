@@ -1,0 +1,9 @@
+#!/usr/bin/dh-exec
+
+*.c usr/src/pamir-ai-eink-${DEB_VERSION_UPSTREAM}/
+*.h usr/src/pamir-ai-eink-${DEB_VERSION_UPSTREAM}/
+Makefile usr/src/pamir-ai-eink-${DEB_VERSION_UPSTREAM}/
+dkms.conf usr/src/pamir-ai-eink-${DEB_VERSION_UPSTREAM}/
+*.dts usr/src/pamir-ai-eink-${DEB_VERSION_UPSTREAM}/
+platform-detect.sh usr/src/pamir-ai-eink-${DEB_VERSION_UPSTREAM}/
+README.md usr/share/doc/pamir-ai-eink-dkms/

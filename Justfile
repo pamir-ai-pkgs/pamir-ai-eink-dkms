@@ -17,7 +17,7 @@ build arch="arm64":
     rm -f ../*.{dsc,tar.*,changes,buildinfo,build}
 
 changelog:
-    dch -i
+    gbp dch -R --ignore-branch --release
 
 module:
     make
